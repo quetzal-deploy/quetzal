@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,6 +69,7 @@ var (
 	cacheChan           = make(chan planner.StepData)
 	stepsDone           = make(map[string]*sync.WaitGroup)
 	stepsDoneChan       = make(chan planner.StepStatus)
+	dotFile             = app.Flag("dot-file", "file to write plan to as a Graphviz dot-file").String()
 )
 
 func deploymentArg(cmd *kingpin.CmdClause) {
@@ -294,42 +296,7 @@ func main() {
 	go cacheWriter()
 	go plannerStepStatusWriter()
 
-	for _, host := range hosts {
-		hostsMap[host.Name] = host
-	}
-
-	plan := planner.EmptyStep()
-	plan.Description = "Root of execution plan"
-
-	fmt.Println("Execution plan:")
-
-	switch clause {
-	case build.FullCommand():
-
-		plan = planner.AddSteps(plan, planner.CreateBuildPlan(hosts))
-
-	case push.FullCommand():
-
-		build := planner.CreateBuildPlan(hosts)
-		push := planner.CreatePushPlan(build.Id, hosts)
-		plan = planner.AddSteps(plan, build, push)
-
-	case deploy.FullCommand():
-		fmt.Println("Execution plan: deploy: Not implemented")
-
-	case healthCheck.FullCommand():
-		fmt.Println("Execution plan: check-health: Not implemented")
-
-	case uploadSecrets.FullCommand():
-		fmt.Println("Execution plan: upload-secrets: Not implemented")
-
-	case listSecrets.FullCommand():
-		fmt.Println("Execution plan: list-secrets: Not implemented")
-
-	case execute.FullCommand():
-		fmt.Println("Execution plan: execute: Not implemented")
-
-	}
+	plan := createPlan(hosts, clause)
 
 	planJson, err := json.MarshalIndent(plan, "", "  ")
 	if err != nil {
@@ -338,7 +305,23 @@ func main() {
 	}
 	fmt.Println(string(planJson))
 
-	if *planOnly {
+	if dotFile != nil && *dotFile != "" {
+		fmt.Println("zebra write to " + *dotFile)
+
+		f, err := os.Create(*dotFile)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+
+		writer := bufio.NewWriter(f)
+
+		planner.WriteDotFile(writer, plan)
+
+		writer.Flush()
+	}
+
+	if *planOnly { // FIXME: Is this really *dryRun instead? Not sure
 		// Don't execute the plan
 		return
 	}
@@ -367,6 +350,161 @@ func main() {
 	// }
 
 	// handleError(err)
+}
+
+func createPlan(hosts []nix.Host, clause string) planner.Step {
+	hostSpecificPlans := make(map[string]planner.Step, 0)
+
+	for _, host := range hosts {
+		hostsMap[host.Name] = host
+
+		hostSpecificPlan := planner.EmptyStep()
+		hostSpecificPlan.Description = "host: " + host.Name
+		hostSpecificPlan.Parallel = false
+
+		hostSpecificPlans[host.Name] = hostSpecificPlan
+	}
+
+	fmt.Println("Execution plan:")
+
+	plan := planner.EmptyStep()
+	plan.Description = "Root of execution plan"
+
+	stepGetSudoPasswd := planner.CreateStepGetSudoPasswd()
+
+	if askForSudoPasswd {
+		plan = planner.AddSteps(plan, stepGetSudoPasswd)
+	}
+
+	switch clause {
+	case build.FullCommand():
+
+		plan = planner.AddSteps(plan, planner.CreateBuildPlan(hosts))
+
+	case push.FullCommand():
+
+		build := planner.CreateBuildPlan(hosts)
+		push := planner.CreatePushPlan(build.Id, hosts)
+		plan = planner.AddSteps(plan, build, push)
+
+	case deploy.FullCommand():
+		fmt.Println("Execution plan: deploy: Not implemented")
+
+		build := planner.CreateBuildPlan(hosts)
+
+		plan = planner.AddSteps(plan, build)
+
+		// FIXME: Add all steps such as askForSudoPasswd ALWAYS, but have a "swipe" step that removes steps that are not required by any others
+
+		for _, host := range hosts {
+			push := planner.CreateStepPush(host)
+			push.DependsOn = append(push.DependsOn, build.Id)
+
+			deployDryActivate := planner.CreateStepDeployDryActivate(host)
+			deploySwitch := planner.CreateStepDeploySwitch(host)
+			deployTest := planner.CreateStepDeployTest(host)
+			deployBoot := planner.CreateStepDeployBoot(host)
+
+			stepReboot := planner.CreateStepReboot(host)
+			stepWaitForOnline := planner.CreateStepRepeatUntilSuccess()
+			stepWaitForOnline = planner.AddSteps(stepWaitForOnline, planner.CreateStepIsOnline(host))
+
+			preDeployChecks := planner.CreateStepHealthChecks(
+				host,
+				host.PreDeployChecks,
+			)
+
+			healthChecks := planner.CreateStepHealthChecks(
+				host,
+				host.HealthChecks,
+			)
+
+			if skipPreDeployChecks {
+				preDeployChecks = planner.CreateStepSkip(preDeployChecks)
+			}
+
+			if skipHealthChecks {
+				healthChecks = planner.CreateStepSkip(healthChecks)
+			}
+
+			if askForSudoPasswd {
+				deployDryActivate.DependsOn = append(deployDryActivate.DependsOn, stepGetSudoPasswd.Id)
+				deploySwitch.DependsOn = append(deploySwitch.DependsOn, stepGetSudoPasswd.Id)
+				deployTest.DependsOn = append(deployTest.DependsOn, stepGetSudoPasswd.Id)
+				deployBoot.DependsOn = append(deployBoot.DependsOn, stepGetSudoPasswd.Id)
+				stepReboot.DependsOn = append(stepReboot.DependsOn, stepGetSudoPasswd.Id)
+			}
+
+			switch deploySwitchAction {
+			case "dry-activate":
+				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
+					hostSpecificPlans[host.Name],
+					push,
+					deployDryActivate,
+				)
+
+			case "test":
+				// FIXME: requires upload secrets
+				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
+					hostSpecificPlans[host.Name],
+					push,
+					preDeployChecks,
+					deployTest,
+					healthChecks,
+				)
+
+			case "switch":
+				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
+					hostSpecificPlans[host.Name],
+					push,
+					preDeployChecks,
+					deploySwitch,
+					healthChecks,
+				)
+
+			case "boot":
+				// FIXME: requires upload secrets
+				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
+					hostSpecificPlans[host.Name],
+					push,
+					preDeployChecks,
+					deployBoot,
+				)
+			}
+
+			// reboot can be added to any action, even if weird..
+			if deployReboot {
+				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
+					hostSpecificPlans[host.Name],
+					stepReboot,
+					stepWaitForOnline,
+					healthChecks,
+				)
+			}
+
+		}
+
+	case healthCheck.FullCommand():
+		// FIXME: Add push
+		healthChecks := planner.CreateHealthCheckPlan(hosts)
+		plan = planner.AddSteps(plan, healthChecks)
+
+	case uploadSecrets.FullCommand():
+		fmt.Println("Execution plan: upload-secrets: Not implemented")
+
+	case listSecrets.FullCommand():
+		fmt.Println("Execution plan: list-secrets: Not implemented")
+
+	case execute.FullCommand():
+		fmt.Println("Execution plan: execute: Not implemented")
+
+	}
+
+	for _, serverPlan := range hostSpecificPlans {
+		plan = planner.AddSteps(plan, serverPlan)
+	}
+
+	return plan
 }
 
 func cacheWriter() {
@@ -445,27 +583,26 @@ func executeStep(step planner.Step) error {
 		// wrapper step, nothing to do
 	}
 
-	// subStepIds := make([]string, 0)
+	if step.Parallel {
+		var wg sync.WaitGroup
 
-	var wg sync.WaitGroup
+		for _, subStep := range step.Steps {
+			wg.Add(1)
+			go func(step planner.Step) {
+				defer wg.Done()
+				executeStep(step)
+			}(subStep)
+		}
 
-	for _, subStep := range step.Steps {
-		// subStepIds = append(subStepIds, subStep.Id)
+		// Wait for children to all be ready, before making the current step ready
+		wg.Wait()
 
-		wg.Add(1)
-		go func(step planner.Step) {
-			defer wg.Done()
-			executeStep(step)
-		}(subStep)
+	} else {
+		for _, subStep := range step.Steps {
+			executeStep(subStep)
+		}
 	}
 
-	// Wait for children to all be ready, before making the current step ready
-	// waitForDependencies(step.Id, "childrenS", subStepIds)
-
-	// FIXME: This will break when actually enabling multi-threading - this step has to wait for all sub steps to complete!
-
-	wg.Wait()
-	wg.Wait()
 	fmt.Println("donkey")
 	stepsDoneChan <- planner.StepStatus{Id: step.Id, Status: "done"}
 
@@ -519,6 +656,41 @@ func executePushStep(step planner.Step) error {
 	err := nix.Push(sshContext, host, closure)
 
 	return err
+}
+
+func executeStepSwitch(step planner.Step) error {
+
+	return nil
+}
+
+func executeStepBoot(step planner.Step) error {
+
+	return nil
+}
+
+func executeStepDryActivate(step planner.Step) error {
+
+	return nil
+}
+
+func executeStepTest(step planner.Step) error {
+
+	return nil
+}
+
+func executeStepReboot(step planner.Step) error {
+
+	return nil
+}
+
+func executeStepHttpCheck(step planner.Step) error {
+
+	return nil
+}
+
+func executeStepCommandCheck(step planner.Step) error {
+
+	return nil
 }
 
 func handleError(err error) {
