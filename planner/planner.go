@@ -305,11 +305,22 @@ func WriteDotFile(writer *bufio.Writer, plan Step) {
 func CreateDotBla(writer *bufio.Writer, step Step) {
 	fmt.Println(step.Description)
 
-	if step.Action == "" || step.Action == "none" {
+	switch step.Action {
+	case "":
+		fallthrough
+	case "none":
 		writer.WriteString(fmt.Sprintf("\t\"%s\"[label = \"<f0> wrapper | <f1> %s\", shape=record, color=grey64, fontcolor=grey64, style=\"rounded,dashed\"]\n", step.Id, step.Description))
-	} else if step.Action == "skip" {
+	case "skip":
 		writer.WriteString(fmt.Sprintf("\t\"%s\"[label = \"<f0> skipped | <f1> %s\", shape=record, color=grey64, style=\"rounded,dashed\"]\n", step.Id, step.Description))
-	} else {
+	case "build":
+		hostsByName := step.Options["hosts"].([]string)
+
+		writer.WriteString(fmt.Sprintf("\t\"%s\"[label = \"<f0> build | <f1> %s", step.Id, step.Description))
+		for i, host := range hostsByName {
+			writer.WriteString(fmt.Sprintf(" | <f%d> %s", i+2, host))
+		}
+		writer.WriteString("\", shape=record, style=rounded]\n")
+	default:
 		writer.WriteString(fmt.Sprintf("\t\"%s\"[label = \"<f0> %s | <f1> %s\", shape=record, style=rounded]\n", step.Id, step.Action, step.Description))
 	}
 
