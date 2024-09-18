@@ -18,6 +18,7 @@ type Step struct {
 	Steps       []Step
 	Options     map[string]interface{}
 	DependsOn   []string
+	Host        *nix.Host
 }
 
 type StepStatus struct {
@@ -40,6 +41,7 @@ func CreateStep(description string, action string, parallel bool, steps []Step, 
 		OnFailure:   onFailure,
 		Options:     options,
 		DependsOn:   dependencies,
+		Host:        nil,
 	}
 
 	return step
@@ -55,6 +57,7 @@ func EmptyStep() Step {
 		OnFailure:   "",
 		Options:     make(map[string]interface{}, 0),
 		DependsOn:   make([]string, 0),
+		Host:        nil,
 	}
 
 	return step

@@ -370,6 +370,8 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 	plan := planner.EmptyStep()
 	plan.Description = "Root of execution plan"
 
+	buildPlan := planner.CreateBuildPlan(hosts)
+
 	stepGetSudoPasswd := planner.CreateStepGetSudoPasswd()
 
 	if askForSudoPasswd {
@@ -379,26 +381,32 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 	switch clause {
 	case build.FullCommand():
 
-		plan = planner.AddSteps(plan, planner.CreateBuildPlan(hosts))
+		plan = planner.AddSteps(plan, buildPlan)
 
 	case push.FullCommand():
 
-		build := planner.CreateBuildPlan(hosts)
-		push := planner.CreatePushPlan(build.Id, hosts)
-		plan = planner.AddSteps(plan, build, push)
+		plan = planner.AddSteps(plan, buildPlan)
+
+		for _, host := range hosts {
+			push := planner.CreateStepPush(host)
+			push.DependsOn = append(push.DependsOn, buildPlan.Id)
+
+			hostSpecificPlans[host.Name] = planner.AddStepsSeq(
+				hostSpecificPlans[host.Name],
+				push,
+			)
+		}
 
 	case deploy.FullCommand():
 		fmt.Println("Execution plan: deploy: Not implemented")
 
-		build := planner.CreateBuildPlan(hosts)
-
-		plan = planner.AddSteps(plan, build)
+		plan = planner.AddSteps(plan, buildPlan)
 
 		// FIXME: Add all steps such as askForSudoPasswd ALWAYS, but have a "swipe" step that removes steps that are not required by any others
 
 		for _, host := range hosts {
 			push := planner.CreateStepPush(host)
-			push.DependsOn = append(push.DependsOn, build.Id)
+			push.DependsOn = append(push.DependsOn, buildPlan.Id)
 
 			deployDryActivate := planner.CreateStepDeployDryActivate(host)
 			deploySwitch := planner.CreateStepDeploySwitch(host)
@@ -485,9 +493,24 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 		}
 
 	case healthCheck.FullCommand():
-		// FIXME: Add push
-		healthChecks := planner.CreateHealthCheckPlan(hosts)
-		plan = planner.AddSteps(plan, healthChecks)
+
+		plan = planner.AddSteps(plan, buildPlan)
+
+		for _, host := range hosts {
+			push := planner.CreateStepPush(host)
+			push.DependsOn = append(push.DependsOn, buildPlan.Id)
+
+			healthChecks := planner.CreateStepHealthChecks(
+				host,
+				host.HealthChecks,
+			)
+
+			hostSpecificPlans[host.Name] = planner.AddStepsSeq(
+				hostSpecificPlans[host.Name],
+				push,
+				healthChecks,
+			)
+		}
 
 	case uploadSecrets.FullCommand():
 		fmt.Println("Execution plan: upload-secrets: Not implemented")
@@ -610,21 +633,21 @@ func executeStep(step planner.Step) error {
 }
 
 func executeBuildStep(step planner.Step) error {
-	hosts := step.Options["hosts"].([]string)
+	hostsByName := step.Options["hosts"].([]string)
 
 	nixHosts := make([]nix.Host, 0)
 
 	fmt.Println("Building hosts:")
-	for _, host := range hosts {
-		fmt.Printf("- %s\n", host)
-		nixHosts = append(nixHosts, hostsMap[host])
+	for _, hostByName := range hostsByName {
+		fmt.Printf("- %s\n", hostByName)
+		nixHosts = append(nixHosts, hostsMap[hostByName])
 	}
 
 	resultPath, err := execBuild(nixHosts)
 	fmt.Println(resultPath)
 
-	for _, host := range hosts {
-		hostPathSymlink := path.Join(resultPath, host)
+	for _, host := range nixHosts {
+		hostPathSymlink := path.Join(resultPath, host.Name)
 		hostPath, err := filepath.EvalSymlinks(hostPathSymlink)
 		if err != nil {
 			return err
@@ -633,9 +656,7 @@ func executeBuildStep(step planner.Step) error {
 		fmt.Println(hostPathSymlink)
 		fmt.Println(hostPath)
 
-		fmt.Println("ares1")
-		cacheChan <- planner.StepData{Key: "closure:" + host, Value: hostPath}
-		fmt.Println("ares2")
+		cacheChan <- planner.StepData{Key: "closure:" + host.Name, Value: hostPath}
 
 		// store hostPath to be fetched by other steps
 	}
@@ -644,16 +665,14 @@ func executeBuildStep(step planner.Step) error {
 }
 
 func executePushStep(step planner.Step) error {
-	hostName := step.Options["to"].(string)
-	host := hostsMap[hostName]
-	cacheKey := "closure:" + host.Name
+	cacheKey := "closure:" + step.Host.Name
 	fmt.Println("cache key: " + cacheKey)
 	closure := cache[cacheKey]
 
-	fmt.Printf("Pushing %s to %s\n", closure, host.TargetHost)
+	fmt.Printf("Pushing %s to %s\n", closure, step.Host.TargetHost)
 
 	sshContext := createSSHContext()
-	err := nix.Push(sshContext, host, closure)
+	err := nix.Push(sshContext, *step.Host, closure)
 
 	return err
 }
