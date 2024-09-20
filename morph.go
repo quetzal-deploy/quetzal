@@ -315,9 +315,7 @@ func main() {
 		defer f.Close()
 
 		writer := bufio.NewWriter(f)
-
 		planner.WriteDotFile(writer, plan)
-
 		writer.Flush()
 	}
 
@@ -412,8 +410,6 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 			deployBoot := planner.CreateStepDeployBoot(host)
 
 			stepReboot := planner.CreateStepReboot(host)
-			// stepWaitForOnline := planner.CreateStepRepeatUntilSuccess(5, 10)
-			// stepWaitForOnline = planner.AddSteps(stepWaitForOnline, planner.CreateStepIsOnline(host))
 
 			stepWaitForOnline := planner.CreateStepWaitForOnline(host)
 

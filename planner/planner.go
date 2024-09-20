@@ -271,7 +271,7 @@ func CreateStepIsOnline(host nix.Host) Step {
 
 	command := Command{
 		Description: "check host is online",
-		Command:     []string{"/bin/true"},
+		Command:     []string{"/bin/sh", "-c", "true"},
 	}
 
 	CreateStepRemoteCommand(host, command)
