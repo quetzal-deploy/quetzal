@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 
-	"github.com/DBCDK/morph/healthchecks"
 	"github.com/DBCDK/morph/nix"
 	"github.com/google/uuid"
 )
@@ -29,6 +28,33 @@ type StepStatus struct {
 type StepData struct {
 	Key   string
 	Value string
+}
+
+type Command struct {
+	Description string
+	Command     []string
+}
+
+type CommandPlus struct {
+	Command Command
+	Period  int
+	Timeout int
+}
+
+type Request struct {
+	Description string
+	Headers     map[string]string
+	Host        *string
+	InsecureSSL bool
+	Path        string
+	Port        int
+	Scheme      string
+}
+
+type RequestPlus struct {
+	Request Request
+	Period  int
+	Timeout int
 }
 
 func CreateStep(description string, action string, parallel bool, steps []Step, onFailure string, options map[string]interface{}, dependencies []string) Step {
@@ -164,73 +190,198 @@ func CreatePushPlan(buildId string, hosts []nix.Host) Step {
 	return pushParent
 }
 
-func CreateStepCommandCheck(host nix.Host, check healthchecks.CmdHealthCheck) Step {
-	step := EmptyStep()
-	step.Description = check.Description
-	step.Action = "cmd-check"
-	step.OnFailure = "retry"
-	// step.DependsOn = append(step.DependsOn, pushId(host), deployId(host)) // FIXME: Stop hardcoding action
-	// FIXME: Checks should depend on push when only pushing, but push AND deploy when actually deploying
+// func CreateStepHealthChecks(host nix.Host, checks healthchecks.HealthChecks) Step {
+// 	gate := CreateStepGate("healthchecks for " + host.Name)
 
-	step.Options["cmd"] = check.Cmd
-	step.Options["period"] = check.Period
-	step.Options["timeout"] = check.Timeout
+// 	for _, check := range checks.Cmd {
+// 		req := CreateStepRemoteCommand(host, check)
+// 		runner := CreateStepRepeatUntilSuccess(check.Period, check.Timeout)
+// 		runner = AddSteps(runner, req)
+
+// 		gate.Steps = append(gate.Steps, runner)
+// 	}
+
+// 	for _, check := range checks.Http {
+// 		req := CreateStepRemoteHttpRequest(host, check)
+// 		runner := CreateStepRepeatUntilSuccess(check.Period, check.Timeout)
+// 		runner = AddSteps(runner, req)
+
+// 		gate.Steps = append(gate.Steps, runner)
+// 	}
+
+// 	return gate
+// }
+
+func CreateStepChecks(host nix.Host, localCommands []CommandPlus, remoteCommands []CommandPlus, localRequests []RequestPlus, remoteRequests []RequestPlus) Step {
+	gate := CreateStepGate("healthchecks for " + host.Name)
+
+	for _, commandPlus := range localCommands {
+		step := CreateStepLocalCommand(host, commandPlus.Command)
+		runner := CreateStepRepeatUntilSuccess(commandPlus.Period, commandPlus.Timeout)
+		runner = AddSteps(runner, step)
+
+		gate.Steps = append(gate.Steps, runner)
+	}
+
+	for _, commandPlus := range remoteCommands {
+		step := CreateStepRemoteCommand(host, commandPlus.Command)
+		runner := CreateStepRepeatUntilSuccess(commandPlus.Period, commandPlus.Timeout)
+		runner = AddSteps(runner, step)
+
+		gate.Steps = append(gate.Steps, runner)
+	}
+
+	for _, reqPlus := range localRequests {
+		step := CreateStepLocalHttpRequest(host, reqPlus.Request)
+		runner := CreateStepRepeatUntilSuccess(reqPlus.Period, reqPlus.Timeout)
+		runner = AddSteps(runner, step)
+
+		gate.Steps = append(gate.Steps, runner)
+	}
+
+	for _, reqPlus := range remoteRequests {
+		step := CreateStepRemoteHttpRequest(host, reqPlus.Request)
+		runner := CreateStepRepeatUntilSuccess(reqPlus.Period, reqPlus.Timeout)
+		runner = AddSteps(runner, step)
+
+		gate.Steps = append(gate.Steps, runner)
+
+	}
+
+	return gate
+}
+
+func CreateStepReboot(host nix.Host) Step {
+	step := EmptyStep()
+	step.Description = "reboot " + host.Name
+	step.Action = "reboot"
+
+	step.Options["host"] = host // FIXME: What is actually needed here?
 
 	return step
 }
 
-func CreateStepHttpCheck(host nix.Host, check healthchecks.HttpHealthCheck) Step {
+// FIXME: change to remote command
+func CreateStepIsOnline(host nix.Host) Step {
 	step := EmptyStep()
-	step.Description = check.Description
-	step.Action = "http-check"
-	step.OnFailure = "retry"
-	// step.DependsOn = append(step.DependsOn, pushId(host)) // FIXME: Stop hardcoding action
+	step.Action = "is-online"
+	step.Description = "test if " + host.Name + " is online"
 
-	step.Options["headers"] = check.Headers
-	step.Options["host"] = check.Host
-	step.Options["insecure-ssl"] = check.InsecureSSL
-	step.Options["path"] = check.Path
-	step.Options["port"] = check.Port
-	step.Options["scheme"] = check.Scheme
-	step.Options["period"] = check.Period
-	step.Options["timeout"] = check.Timeout
+	step.Options["host"] = host
+
+	command := Command{
+		Description: "check host is online",
+		Command:     []string{"/bin/true"},
+	}
+
+	CreateStepRemoteCommand(host, command)
 
 	return step
 }
 
-func CreateStepHealthChecks(host nix.Host, checks healthchecks.HealthChecks) Step {
+func CreateStepWaitForOnline(host nix.Host) Step {
 	step := EmptyStep()
-	step.Description = "healthchecks for " + host.TargetHost
-	step.Action = "healthchecks"
-	// step.DependsOn = append(step.DependsOn, deployId(host))
+	step.Action = "wait-for-online"
+	step.Description = fmt.Sprintf("Wait for %s to come online", host.Name)
+
+	timeout := 5
+	period := 10
+
+	wait := CreateStepRepeatUntilSuccess(timeout, period)
+	wait = AddSteps(wait, CreateStepIsOnline(host))
+
+	step = AddSteps(step, wait)
+
+	return step
+}
+
+func CreateStepRepeatUntilSuccess(period int, timeout int) Step {
+	step := EmptyStep()
+	step.Action = "repeat-until-success"
+	step.Description = fmt.Sprintf("period=%d timeout=%d", period, timeout)
+	step.Options["period"] = timeout
+	step.Options["timeout"] = timeout
+
+	return step
+}
+
+func CreateStepGate(description string) Step {
+	step := EmptyStep()
+	step.Action = "gate"
+	step.Description = description
 	step.Parallel = true
-	step.OnFailure = "retry" // all sub-steps also retry - should both do that, or only the parent? or only the children?
-
-	for _, check := range checks.Cmd {
-		step.Steps = append(step.Steps, CreateStepCommandCheck(host, check))
-	}
-
-	for _, check := range checks.Http {
-		step.Steps = append(step.Steps, CreateStepHttpCheck(host, check))
-	}
+	step.OnFailure = "retry"
 
 	return step
 }
 
-func CreateHealthCheckPlan(hosts []nix.Host) Step {
-	plan := EmptyStep()
-	plan.Description = "healthchecks"
-	plan.Action = ""
-	plan.Parallel = true
-	plan.OnFailure = ""
+// commands
 
-	for _, host := range hosts {
-		step := CreateStepHealthChecks(host, host.HealthChecks)
-		plan = AddSteps(plan, step)
+func createStepCommand(location string, host nix.Host, command Command) Step {
+	step := EmptyStep()
+
+	switch location {
+	case "local":
+		step.Action = "local-command"
+	case "remote":
+		step.Action = "remote-command"
+	default:
+		panic("Unknown location type")
 	}
 
-	return plan
+	step.Description = command.Description
+	step.Host = &host
+
+	step.Options["cmd"] = command.Command
+
+	return step
 }
+
+func CreateStepLocalCommand(host nix.Host, command Command) Step {
+	return createStepCommand("local", host, command)
+}
+
+func CreateStepRemoteCommand(host nix.Host, command Command) Step {
+	return createStepCommand("remote", host, command)
+}
+
+// HTTP requests
+
+func createStepHttpRequest(location string, host nix.Host, req Request) Step {
+	step := EmptyStep()
+
+	switch location {
+	case "local":
+		step.Action = "local-http"
+	case "remote":
+		step.Action = "remote-http"
+	default:
+		panic("Unknown location type")
+	}
+
+	step.Description = req.Description
+
+	step.Options["headers"] = req.Headers
+	step.Options["host"] = req.Host
+	step.Options["insecure-ssl"] = req.InsecureSSL
+	step.Options["path"] = req.Path
+	step.Options["port"] = req.Port
+	step.Options["scheme"] = req.Scheme
+
+	return step
+}
+
+// FIXME: Get rid of the health check types
+func CreateStepLocalHttpRequest(host nix.Host, req Request) Step {
+	return createStepHttpRequest("local", host, req)
+}
+
+// FIXME: Get rid of the health check types
+func CreateStepRemoteHttpRequest(host nix.Host, req Request) Step {
+	return createStepHttpRequest("remote", host, req)
+}
+
+// deploy wrappers
 
 func createStepDeploy(deployAction string, host nix.Host, dependencies ...Step) Step {
 	step := EmptyStep()
@@ -244,34 +395,6 @@ func createStepDeploy(deployAction string, host nix.Host, dependencies ...Step) 
 	}
 
 	step.Options["host"] = host // FIXME: What is actually needed here?
-
-	return step
-}
-
-func CreateStepReboot(host nix.Host) Step {
-	step := EmptyStep()
-	step.Description = "reboot " + host.Name
-	step.Action = "reboot"
-
-	step.Options["host"] = host // FIXME: What is actually needed here?
-
-	return step
-}
-
-func CreateStepIsOnline(host nix.Host) Step {
-	step := EmptyStep()
-	step.Description = "test if " + host.Name + " is online"
-	step.Action = "is-online"
-
-	step.Options["host"] = host
-
-	return step
-}
-
-func CreateStepRepeatUntilSuccess() Step {
-	step := EmptyStep()
-	step.Description = "repeat sub-steps until success"
-	step.Action = "repeat-until-success"
 
 	return step
 }
@@ -291,6 +414,8 @@ func CreateStepDeploySwitch(host nix.Host, dependencies ...Step) Step {
 func CreateStepDeployTest(host nix.Host, dependencies ...Step) Step {
 	return createStepDeploy("test", host, dependencies...)
 }
+
+// dot file output
 
 func WriteDotFile(writer *bufio.Writer, plan Step) {
 	writer.WriteString("digraph G {\n")

@@ -402,8 +402,6 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 
 		plan = planner.AddSteps(plan, buildPlan)
 
-		// FIXME: Add all steps such as askForSudoPasswd ALWAYS, but have a "swipe" step that removes steps that are not required by any others
-
 		for _, host := range hosts {
 			push := planner.CreateStepPush(host)
 			push.DependsOn = append(push.DependsOn, buildPlan.Id)
@@ -414,17 +412,25 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 			deployBoot := planner.CreateStepDeployBoot(host)
 
 			stepReboot := planner.CreateStepReboot(host)
-			stepWaitForOnline := planner.CreateStepRepeatUntilSuccess()
-			stepWaitForOnline = planner.AddSteps(stepWaitForOnline, planner.CreateStepIsOnline(host))
+			// stepWaitForOnline := planner.CreateStepRepeatUntilSuccess(5, 10)
+			// stepWaitForOnline = planner.AddSteps(stepWaitForOnline, planner.CreateStepIsOnline(host))
 
-			preDeployChecks := planner.CreateStepHealthChecks(
+			stepWaitForOnline := planner.CreateStepWaitForOnline(host)
+
+			preDeployChecks := planner.CreateStepChecks(
 				host,
-				host.PreDeployChecks,
+				make([]planner.CommandPlus, 0),
+				planner.HealthChecksToCommands(host.PreDeployChecks.Cmd),
+				make([]planner.RequestPlus, 0),
+				planner.HealthChecksToRequests(host.PreDeployChecks.Http),
 			)
 
-			healthChecks := planner.CreateStepHealthChecks(
+			healthChecks := planner.CreateStepChecks(
 				host,
-				host.HealthChecks,
+				make([]planner.CommandPlus, 0),
+				planner.HealthChecksToCommands(host.HealthChecks.Cmd),
+				make([]planner.RequestPlus, 0),
+				planner.HealthChecksToRequests(host.HealthChecks.Http),
 			)
 
 			if skipPreDeployChecks {
@@ -500,9 +506,12 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 			push := planner.CreateStepPush(host)
 			push.DependsOn = append(push.DependsOn, buildPlan.Id)
 
-			healthChecks := planner.CreateStepHealthChecks(
+			healthChecks := planner.CreateStepChecks(
 				host,
-				host.HealthChecks,
+				make([]planner.CommandPlus, 0),
+				planner.HealthChecksToCommands(host.HealthChecks.Cmd),
+				make([]planner.RequestPlus, 0),
+				planner.HealthChecksToRequests(host.HealthChecks.Http),
 			)
 
 			hostSpecificPlans[host.Name] = planner.AddStepsSeq(
@@ -601,6 +610,8 @@ func executeStep(step planner.Step) error {
 		executePushStep(step)
 
 	case "none":
+		fallthrough
+	case "skip":
 		fallthrough
 	case "":
 		// wrapper step, nothing to do
