@@ -70,6 +70,36 @@ type NixContext struct {
 	AllowBuildShell bool
 }
 
+func GetNixContext(assetRoot string, showTrace bool, keepGCRoot bool, allowBuildShell bool) *NixContext {
+	evalCmd := os.Getenv("MORPH_NIX_EVAL_CMD")
+	buildCmd := os.Getenv("MORPH_NIX_BUILD_CMD")
+	shellCmd := os.Getenv("MORPH_NIX_SHELL_CMD")
+	evalMachines := os.Getenv("MORPH_NIX_EVAL_MACHINES")
+
+	if evalCmd == "" {
+		evalCmd = "nix-instantiate"
+	}
+	if buildCmd == "" {
+		buildCmd = "nix-build"
+	}
+	if shellCmd == "" {
+		shellCmd = "nix-shell"
+	}
+	if evalMachines == "" {
+		evalMachines = filepath.Join(assetRoot, "eval-machines.nix")
+	}
+
+	return &NixContext{
+		EvalCmd:         evalCmd,
+		BuildCmd:        buildCmd,
+		ShellCmd:        shellCmd,
+		EvalMachines:    evalMachines,
+		ShowTrace:       showTrace,
+		KeepGCRoot:      keepGCRoot,
+		AllowBuildShell: allowBuildShell,
+	}
+}
+
 type NixBuildInvocationArgs struct {
 	ArgsFile        string
 	Attr            string

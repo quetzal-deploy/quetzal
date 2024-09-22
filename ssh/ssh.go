@@ -5,8 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/DBCDK/morph/utils"
-	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"os"
 	"os/exec"
@@ -14,6 +12,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/DBCDK/morph/utils"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 type Context interface {
@@ -433,4 +434,15 @@ func (ctx *SSHContext) WaitForMountPoints(host Host, path string) (err error) {
 	}
 
 	return nil
+}
+
+func CreateSSHContext(askForSudoPasswd bool, passCmd string) *SSHContext {
+	return &SSHContext{
+		AskForSudoPassword:     askForSudoPasswd,
+		GetSudoPasswordCommand: passCmd,
+		IdentityFile:           os.Getenv("SSH_IDENTITY_FILE"),
+		DefaultUsername:        os.Getenv("SSH_USER"),
+		SkipHostKeyCheck:       os.Getenv("SSH_SKIP_HOST_KEY_CHECK") != "",
+		ConfigFile:             os.Getenv("SSH_CONFIG_FILE"),
+	}
 }

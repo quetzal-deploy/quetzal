@@ -25,11 +25,6 @@ type StepStatus struct {
 	Status string
 }
 
-type StepData struct {
-	Key   string
-	Value string
-}
-
 type Command struct {
 	Description string
 	Command     []string
@@ -167,10 +162,10 @@ func CreateStepSkip(skippedStep Step) Step {
 
 func CreateStepPush(host nix.Host) Step {
 	options := EmptyOptions()
-	options["to"] = host.Name
 
 	step := CreateStep(fmt.Sprintf("push to %s", host.Name), "push", true, EmptySteps(), "exit", options, make([]string, 0))
 	step.Id = pushId(host)
+	step.Host = &host
 
 	return step
 }
