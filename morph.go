@@ -310,6 +310,10 @@ func main() {
 	hosts, err := cruft.GetHosts(mctx, deployment)
 	common.HandleError(err)
 
+	for _, host := range hosts {
+		hostsMap[host.Name] = host
+	}
+
 	plan := createPlan(hosts, clause)
 
 	planJson, err := json.MarshalIndent(plan, "", "  ")
@@ -381,8 +385,6 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 	hostSpecificPlans := make(map[string]planner.Step, 0)
 
 	for _, host := range hosts {
-		hostsMap[host.Name] = host
-
 		hostSpecificPlan := planner.EmptyStep()
 		hostSpecificPlan.Description = "host: " + host.Name
 		hostSpecificPlan.Parallel = false
