@@ -2,6 +2,7 @@ package executors
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 
@@ -12,39 +13,12 @@ import (
 	"github.com/DBCDK/morph/ssh"
 )
 
-var (
-	cache     = make(map[string]string)
-	cacheChan = make(chan StepData)
-)
-
-type StepData struct {
-	Key   string
-	Value string
-}
-
-func cacheWriter() {
-	for update := range cacheChan {
-		fmt.Printf("cache update: %s = %s\n", update.Key, update.Value)
-		cache[update.Key] = update.Value
-	}
-}
-
 type DefaultPlanExecutor struct {
 	Hosts        map[string]nix.Host
 	MorphContext *common.MorphContext
 	SSHContext   *ssh.SSHContext
 	NixContext   *nix.NixContext
-}
-
-func (ex DefaultPlanExecutor) Init() error {
-	go cacheWriter()
-
-	return nil
-}
-
-func (ex DefaultPlanExecutor) TearDown() error {
-
-	return nil
+	Cache        planner.Cache
 }
 
 func (ex DefaultPlanExecutor) GetHosts() map[string]nix.Host {
@@ -62,6 +36,11 @@ func (ex DefaultPlanExecutor) GetSSHContext() *ssh.SSHContext {
 func (ex DefaultPlanExecutor) GetNixContext() *nix.NixContext {
 	return ex.NixContext
 }
+
+// func (ex DefaultPlanExecutor) SetCache(cache planner.Cache) {
+// 	ex.Cache = cache
+// 	problably something goes wrong here ^
+// }
 
 func (executor DefaultPlanExecutor) Build(step planner.Step) error {
 	hostsByName := step.Options["hosts"].([]string)
@@ -91,7 +70,7 @@ func (executor DefaultPlanExecutor) Build(step planner.Step) error {
 		fmt.Println(hostPathSymlink)
 		fmt.Println(hostPath)
 
-		cacheChan <- StepData{Key: "closure:" + host.Name, Value: hostPath}
+		executor.Cache.Update(planner.StepData{Key: "closure:" + host.Name, Value: hostPath})
 
 		// store hostPath to be fetched by other steps
 	}
@@ -102,34 +81,49 @@ func (executor DefaultPlanExecutor) Build(step planner.Step) error {
 func (executor DefaultPlanExecutor) Push(step planner.Step) error {
 	cacheKey := "closure:" + step.Host.Name
 	fmt.Println("cache key: " + cacheKey)
-	closure := cache[cacheKey]
+	closure, err := executor.Cache.Get(cacheKey)
+	if err != nil {
+		return err
+	}
 
 	fmt.Printf("Pushing %s to %s\n", closure, step.Host.TargetHost)
 
 	sshContext := executor.GetSSHContext()
-	err := nix.Push(sshContext, *step.Host, closure)
+	err = nix.Push(sshContext, *step.Host, closure)
 
 	return err
 }
 
-func (executor DefaultPlanExecutor) DeploySwitch(step planner.Step) error {
+func (executor DefaultPlanExecutor) deployAction(action string, step planner.Step) error {
+	fmt.Fprintf(os.Stderr, "Executing %s on %s", action, step.Host.Name)
+
+	closure, err := executor.Cache.Get("closure:" + step.Host.Name)
+	if err != nil {
+		return err
+	}
+
+	err = executor.MorphContext.SSHContext.ActivateConfiguration(step.Host, closure, action)
+	if err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func (executor DefaultPlanExecutor) DeploySwitch(step planner.Step) error {
+	return executor.deployAction("switch", step)
 }
 
 func (executor DefaultPlanExecutor) DeployBoot(step planner.Step) error {
-
-	return nil
+	return executor.deployAction("boot", step)
 }
 
 func (executor DefaultPlanExecutor) DeployDryActivate(step planner.Step) error {
-
-	return nil
+	return executor.deployAction("dry-activate", step)
 }
 
 func (executor DefaultPlanExecutor) DeployTest(step planner.Step) error {
-
-	return nil
+	return executor.deployAction("test", step)
 }
 
 func (executor DefaultPlanExecutor) Reboot(step planner.Step) error {

@@ -17,8 +17,6 @@ var (
 )
 
 type PlanExecutor interface {
-	Init() error
-	TearDown() error
 	GetMorphContext() *common.MorphContext // FIXME: Get rid of this or limit it a lot
 	GetSSHContext() *ssh.SSHContext
 	GetNixContext() *nix.NixContext
@@ -58,6 +56,18 @@ func ExecuteStep(executor PlanExecutor, step Step) error {
 
 	case "push":
 		executor.Push(step)
+
+	case "boot":
+		executor.DeployBoot(step)
+
+	case "dry-activate":
+		executor.DeployDryActivate(step)
+
+	case "switch":
+		executor.DeploySwitch(step)
+
+	case "test":
+		executor.DeployTest(step)
 
 	case "none":
 		fallthrough
@@ -130,5 +140,41 @@ func waitForDependencies(id string, hint string, dependencies []string) {
 			// Sleep if we haven't seen the dependency
 			time.Sleep(1 * time.Second)
 		}
+	}
+}
+
+type Cache struct {
+	data    map[string]string
+	channel chan StepData
+}
+
+func NewCache() Cache {
+	cache := Cache{
+		data:    make(map[string]string),
+		channel: make(chan StepData),
+	}
+
+	go cache.run()
+
+	return cache
+}
+
+func (cache Cache) Update(msg StepData) error {
+	fmt.Printf("cache: write to channel %v\n", cache.channel)
+	cache.channel <- msg
+
+	return nil
+}
+
+func (cache Cache) Get(key string) (string, error) {
+	// FIXME: return error on cache miss
+
+	return cache.data[key], nil
+}
+
+func (cache Cache) run() {
+	for update := range cache.channel {
+		fmt.Printf("cache update: %s = %s\n", update.Key, update.Value)
+		cache.data[update.Key] = update.Value
 	}
 }

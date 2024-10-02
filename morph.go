@@ -23,6 +23,7 @@ var version string
 var assetRoot string
 
 var switchActions = []string{"dry-activate", "test", "switch", "boot"}
+var planActions = []string{"run", "resume"}
 
 var (
 	app                 = kingpin.New("morph", "NixOS host manager").Version(version)
@@ -44,6 +45,11 @@ var (
 	eval                = evalCmd(app.Command("eval", "Inspect value of an attribute without building"))
 	push                = pushCmd(app.Command("push", "Build and transfer items from the local Nix store to target machines"))
 	deploy              = deployCmd(app.Command("deploy", "Build, push and activate new configuration on machines according to switch-action"))
+	_planRoot           = app.Command("plan", "Create, run and resume plans")
+	_planRun            = runPlanCmd(_planRoot.Command("run", "Run an existing plan"))
+	_planResume         = resumePlanCmd(_planRoot.Command("resume", "Resume an existing plan"))
+	planAction          string
+	planFile            string
 	deploySwitchAction  string
 	deployUploadSecrets bool
 	deployReboot        bool
@@ -225,6 +231,25 @@ func deployCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
 	return cmd
 }
 
+func planFileArg(cmd *kingpin.CmdClause) {
+	cmd.Arg("plan", "File containing the deployment plan").
+		HintFiles("json").
+		Required().
+		ExistingFileVar(&planFile)
+}
+
+func runPlanCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
+	planFileArg(cmd)
+
+	return cmd
+}
+
+func resumePlanCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
+	planFileArg(cmd)
+
+	return cmd
+}
+
 func healthCheckCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
 	selectorFlags(cmd)
 	showTraceFlag(cmd)
@@ -306,55 +331,64 @@ func main() {
 		return
 	}
 
-	// setup hosts
-	hosts, err := cruft.GetHosts(mctx, deployment)
-	common.HandleError(err)
+	switch clause {
+	case _planRun.FullCommand():
+		fmt.Printf("running plan: %s", planFile)
 
-	for _, host := range hosts {
-		hostsMap[host.Name] = host
-	}
+	case _planResume.FullCommand():
+		fmt.Printf("resuming  plan: %s", planFile)
 
-	plan := createPlan(hosts, clause)
+	default:
+		// setup hosts
+		// FIXME: Should this be its own step instead?
+		// But then what about the generated plan? It can no longer contain the lists of hosts, but only the deployment and filters users, which will make resume difficult..
+		hosts, err := cruft.GetHosts(mctx, deployment)
+		common.HandleError(err)
 
-	planJson, err := json.MarshalIndent(plan, "", "  ")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(string(planJson))
+		for _, host := range hosts {
+			hostsMap[host.Name] = host
+		}
 
-	if dotFile != nil && *dotFile != "" {
-		f, err := os.Create(*dotFile)
+		plan := createPlan(hosts, clause)
+
+		planJson, err := json.MarshalIndent(plan, "", "  ")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Println(string(planJson))
+
+		if dotFile != nil && *dotFile != "" {
+			f, err := os.Create(*dotFile)
+			if err != nil {
+				panic(err)
+			}
+			defer f.Close()
+
+			writer := bufio.NewWriter(f)
+			planner.WriteDotFile(writer, plan)
+			writer.Flush()
+		}
+
+		if *planOnly { // FIXME: Is this really *dryRun instead? Not sure
+			// Don't execute the plan
+			return
+		}
+
+		cache := planner.NewCache()
+
+		executor := executors.DefaultPlanExecutor{
+			Hosts:        hostsMap,
+			MorphContext: mctx,
+			SSHContext:   ssh.CreateSSHContext(askForSudoPasswd, passCmd),
+			NixContext:   nix.GetNixContext(assetRoot, showTrace, *keepGCRoot, *allowBuildShell),
+			Cache:        cache,
+		}
+
+		err = planner.ExecutePlan(executor, plan)
 		if err != nil {
 			panic(err)
 		}
-		defer f.Close()
-
-		writer := bufio.NewWriter(f)
-		planner.WriteDotFile(writer, plan)
-		writer.Flush()
-	}
-
-	if *planOnly { // FIXME: Is this really *dryRun instead? Not sure
-		// Don't execute the plan
-		return
-	}
-
-	executor := executors.DefaultPlanExecutor{
-		Hosts:        hostsMap,
-		MorphContext: mctx,
-		SSHContext:   ssh.CreateSSHContext(askForSudoPasswd, passCmd),
-		NixContext:   nix.GetNixContext(assetRoot, showTrace, *keepGCRoot, *allowBuildShell),
-	}
-
-	err = executor.Init()
-	if err != nil {
-		panic(err)
-	}
-
-	err = planner.ExecutePlan(executor, plan)
-	if err != nil {
-		panic(err)
 	}
 
 	// switch clause {

@@ -8,6 +8,13 @@ import (
 	"github.com/google/uuid"
 )
 
+type Plan struct {
+	Steps      []Step
+	StepStatus map[string]string // FIXME: Step ID's - should probably be some custom type with more data about the step that ran (like errors)
+	StepDone   map[string]bool   // FIXME: Probably don't need both this and StepStatus
+	Cache      map[string]string // FIXME: ? Data written to the cache during processing // the StepData and cacheWriter stuff should probably be formalized somehow and moved away from the specific implementation
+}
+
 type Step struct {
 	Id          string
 	Description string
@@ -18,11 +25,17 @@ type Step struct {
 	Options     map[string]interface{}
 	DependsOn   []string
 	Host        *nix.Host
+	CanResume   bool
 }
 
 type StepStatus struct {
 	Id     string
 	Status string
+}
+
+type StepData struct {
+	Key   string
+	Value string
 }
 
 type Command struct {
@@ -63,6 +76,7 @@ func CreateStep(description string, action string, parallel bool, steps []Step, 
 		Options:     options,
 		DependsOn:   dependencies,
 		Host:        nil,
+		CanResume:   true,
 	}
 
 	return step
@@ -79,6 +93,7 @@ func EmptyStep() Step {
 		Options:     make(map[string]interface{}, 0),
 		DependsOn:   make([]string, 0),
 		Host:        nil,
+		CanResume:   true,
 	}
 
 	return step
@@ -148,6 +163,7 @@ func CreateStepGetSudoPasswd() Step {
 	step := EmptyStep()
 	step.Description = "Get sudo password"
 	step.Action = "get-sudo-passwd"
+	step.CanResume = false
 
 	return step
 }
@@ -384,12 +400,11 @@ func createStepDeploy(deployAction string, host nix.Host, dependencies ...Step) 
 	step.Description = "deploy " + host.Name
 	step.Action = deployAction
 	step.OnFailure = ""
+	step.Host = &host
 
 	for _, dependency := range dependencies {
 		step.DependsOn = append(step.DependsOn, dependency.Id)
 	}
-
-	step.Options["host"] = host // FIXME: What is actually needed here?
 
 	return step
 }
