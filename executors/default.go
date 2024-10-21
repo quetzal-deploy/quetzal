@@ -13,6 +13,116 @@ import (
 	"github.com/DBCDK/morph/ssh"
 )
 
+// FIXME: IDEA: Deployment simulation - make a fake MorphContext where things like SSH-calls are faked and logged instead
+
+type StepSettings struct {
+	Parallel bool
+}
+
+type StepX interface {
+	SetOptions(options StepSettings)
+	Run(mctx *common.MorphContext, cache *planner.Cache) error
+}
+
+type Build struct {
+	hosts []nix.Host
+}
+
+func (step Build) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+	resultPath, err := cruft.ExecBuild(mctx, step.hosts)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(resultPath)
+
+	for _, host := range step.hosts {
+		hostPathSymlink := path.Join(resultPath, host.Name)
+		hostPath, err := filepath.EvalSymlinks(hostPathSymlink)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(hostPathSymlink)
+		fmt.Println(hostPath)
+
+		cache.Update(planner.StepData{Key: "closure:" + host.Name, Value: hostPath})
+	}
+
+	return err
+}
+
+type Push struct {
+	host nix.Host
+}
+
+func (step Push) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+	cacheKey := "closure:" + step.host.Name
+	fmt.Println("cache key: " + cacheKey)
+	closure, err := cache.Get(cacheKey)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Pushing %s to %s\n", closure, step.host.TargetHost)
+
+	err = nix.Push(mctx.SSHContext, step.host, closure)
+
+	return err
+}
+
+// func (step DeploySwitch) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+
+// }
+
+func deployAction(mctx *common.MorphContext, cache *planner.Cache, host nix.Host, deployAction string) error {
+	fmt.Fprintf(os.Stderr, "Executing %s on %s", deployAction, host.Name)
+
+	closure, err := cache.Get("closure:" + host.Name)
+	if err != nil {
+		return err
+	}
+
+	err = mctx.SSHContext.ActivateConfiguration(&host, closure, deployAction)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type DeployBoot struct {
+	host nix.Host
+}
+
+type DeployDryActivate struct {
+	host nix.Host
+}
+
+type DeploySwitch struct {
+	host nix.Host
+}
+
+type DeployTest struct {
+	host nix.Host
+}
+
+func (step DeployBoot) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+	return deployAction(mctx, cache, step.host, "boot")
+}
+
+func (step DeployDryActivate) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+	return deployAction(mctx, cache, step.host, "dry-activate")
+}
+
+func (step DeploySwitch) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+	return deployAction(mctx, cache, step.host, "switch")
+}
+
+func (step DeployTest) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+	return deployAction(mctx, cache, step.host, "test")
+}
+
 type DefaultPlanExecutor struct {
 	Hosts        map[string]nix.Host
 	MorphContext *common.MorphContext
