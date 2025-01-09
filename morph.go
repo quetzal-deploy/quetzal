@@ -287,6 +287,12 @@ func setup() {
 }
 
 func main() {
+	// TODO: Implement "context" part of a plan is running on:
+	// Default context = local
+	// A context can change the host something is running on
+	// nix copy morph itself to the new host, and execute it with the sub-plan
+	// eg context:local -> repeat-until-success -> context:$host -> exec command (health check)
+	// Running the deploy from Matrix can also be a context, and the local morph will wait for it to finish
 
 	clause := kingpin.MustParse(app.Parse(os.Args[1:]))
 
@@ -378,7 +384,7 @@ func main() {
 		cache := planner.NewCache()
 
 		executor := executors.DefaultPlanExecutor{
-			Hosts:        hostsMap,
+			Hosts:        hostsMap, // FIXME: Either get rid of this, or set the hosts from a new EvalDeployment step. Each deployment will need its own executor probably.
 			MorphContext: mctx,
 			SSHContext:   ssh.CreateSSHContext(askForSudoPasswd, passCmd),
 			NixContext:   nix.GetNixContext(assetRoot, showTrace, *keepGCRoot, *allowBuildShell),
@@ -421,6 +427,7 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 	for _, host := range hosts {
 		hostSpecificPlan := planner.EmptyStep()
 		hostSpecificPlan.Description = "host: " + host.Name
+		hostSpecificPlan.Action = planner.NoAction{}
 		hostSpecificPlan.Parallel = false
 
 		hostSpecificPlans[host.Name] = hostSpecificPlan

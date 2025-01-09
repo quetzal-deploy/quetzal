@@ -44,13 +44,13 @@ func ExecutePlan(executor PlanExecutor, plan Step) error {
 }
 
 func ExecuteStep(executor PlanExecutor, step Step) error {
-	fmt.Printf("Running step %s: %s (dependencies: %v)\n", step.Action, step.Description, step.DependsOn)
+	fmt.Printf("Running step %s: %s (dependencies: %v)\n", step.ActionName, step.Description, step.DependsOn)
 
 	stepsDoneChan <- StepStatus{Id: step.Id, Status: "started"}
 
 	waitForDependencies(step.Id, "dependencies", step.DependsOn)
 
-	switch step.Action {
+	switch step.ActionName {
 	case "build":
 		executor.Build(step)
 

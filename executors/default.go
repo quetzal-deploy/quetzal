@@ -15,15 +15,6 @@ import (
 
 // FIXME: IDEA: Deployment simulation - make a fake MorphContext where things like SSH-calls are faked and logged instead
 
-type StepSettings struct {
-	Parallel bool
-}
-
-type StepX interface {
-	SetOptions(options StepSettings)
-	Run(mctx *common.MorphContext, cache *planner.Cache) error
-}
-
 type Build struct {
 	hosts []nix.Host
 }
@@ -153,7 +144,7 @@ func (ex DefaultPlanExecutor) GetNixContext() *nix.NixContext {
 // }
 
 func (executor DefaultPlanExecutor) Build(step planner.Step) error {
-	hostsByName := step.Options["hosts"].([]string)
+	hostsByName := step.Action.(planner.Build).Hosts
 
 	nixHosts := make([]nix.Host, 0)
 
@@ -189,30 +180,31 @@ func (executor DefaultPlanExecutor) Build(step planner.Step) error {
 }
 
 func (executor DefaultPlanExecutor) Push(step planner.Step) error {
-	cacheKey := "closure:" + step.Host.Name
+	hostName := step.Action.(planner.Push).Host
+	cacheKey := "closure:" + hostName
 	fmt.Println("cache key: " + cacheKey)
 	closure, err := executor.Cache.Get(cacheKey)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Pushing %s to %s\n", closure, step.Host.TargetHost)
+	fmt.Printf("Pushing %s to %s\n", closure, executor.Hosts[hostName].TargetHost)
 
 	sshContext := executor.GetSSHContext()
-	err = nix.Push(sshContext, *step.Host, closure)
+	err = nix.Push(sshContext, executor.Hosts[hostName], closure)
 
 	return err
 }
 
-func (executor DefaultPlanExecutor) deployAction(action string, step planner.Step) error {
-	fmt.Fprintf(os.Stderr, "Executing %s on %s", action, step.Host.Name)
+func (executor DefaultPlanExecutor) deployAction(action string, step planner.Step, host nix.Host) error {
+	fmt.Fprintf(os.Stderr, "Executing %s on %s", action, host.Name)
 
-	closure, err := executor.Cache.Get("closure:" + step.Host.Name)
+	closure, err := executor.Cache.Get("closure:" + host.Name)
 	if err != nil {
 		return err
 	}
 
-	err = executor.MorphContext.SSHContext.ActivateConfiguration(step.Host, closure, action)
+	err = executor.MorphContext.SSHContext.ActivateConfiguration(&host, closure, action)
 	if err != nil {
 		return err
 	}
@@ -221,19 +213,27 @@ func (executor DefaultPlanExecutor) deployAction(action string, step planner.Ste
 }
 
 func (executor DefaultPlanExecutor) DeploySwitch(step planner.Step) error {
-	return executor.deployAction("switch", step)
+	hostName := step.Action.(planner.DeploySwitch).Host
+
+	return executor.deployAction("switch", step, executor.GetHosts()[hostName])
 }
 
 func (executor DefaultPlanExecutor) DeployBoot(step planner.Step) error {
-	return executor.deployAction("boot", step)
+	hostName := step.Action.(planner.DeployBoot).Host
+
+	return executor.deployAction("boot", step, executor.GetHosts()[hostName])
 }
 
 func (executor DefaultPlanExecutor) DeployDryActivate(step planner.Step) error {
-	return executor.deployAction("dry-activate", step)
+	hostName := step.Action.(planner.DeployDryActivate).Host
+
+	return executor.deployAction("dry-activate", step, executor.GetHosts()[hostName])
 }
 
 func (executor DefaultPlanExecutor) DeployTest(step planner.Step) error {
-	return executor.deployAction("test", step)
+	hostName := step.Action.(planner.DeployTest).Host
+
+	return executor.deployAction("test", step, executor.GetHosts()[hostName])
 }
 
 func (executor DefaultPlanExecutor) Reboot(step planner.Step) error {
