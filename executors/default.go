@@ -2,6 +2,8 @@ package executors
 
 import (
 	"fmt"
+	"github.com/DBCDK/morph/actions"
+	"github.com/DBCDK/morph/cache"
 	"os"
 	"path"
 	"path/filepath"
@@ -19,7 +21,7 @@ type Build struct {
 	hosts []nix.Host
 }
 
-func (step Build) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+func (step Build) Run(mctx *common.MorphContext, cache_ *cache.Cache) error {
 	resultPath, err := cruft.ExecBuild(mctx, step.hosts)
 	if err != nil {
 		return err
@@ -37,7 +39,7 @@ func (step Build) Run(mctx *common.MorphContext, cache *planner.Cache) error {
 		fmt.Println(hostPathSymlink)
 		fmt.Println(hostPath)
 
-		cache.Update(planner.StepData{Key: "closure:" + host.Name, Value: hostPath})
+		cache_.Update(cache.StepData{Key: "closure:" + host.Name, Value: hostPath})
 	}
 
 	return err
@@ -47,10 +49,10 @@ type Push struct {
 	host nix.Host
 }
 
-func (step Push) Run(mctx *common.MorphContext, cache *planner.Cache) error {
+func (step Push) Run(mctx *common.MorphContext, cache_ *cache.Cache) error {
 	cacheKey := "closure:" + step.host.Name
-	fmt.Println("cache key: " + cacheKey)
-	closure, err := cache.Get(cacheKey)
+	fmt.Println("cache_ key: " + cacheKey)
+	closure, err := cache_.Get(cacheKey)
 	if err != nil {
 		return err
 	}
@@ -66,10 +68,10 @@ func (step Push) Run(mctx *common.MorphContext, cache *planner.Cache) error {
 
 // }
 
-func deployAction(mctx *common.MorphContext, cache *planner.Cache, host nix.Host, deployAction string) error {
+func deployAction(mctx *common.MorphContext, cache_ *cache.Cache, host nix.Host, deployAction string) error {
 	fmt.Fprintf(os.Stderr, "Executing %s on %s", deployAction, host.Name)
 
-	closure, err := cache.Get("closure:" + host.Name)
+	closure, err := cache_.Get("closure:" + host.Name)
 	if err != nil {
 		return err
 	}
@@ -98,20 +100,20 @@ type DeployTest struct {
 	host nix.Host
 }
 
-func (step DeployBoot) Run(mctx *common.MorphContext, cache *planner.Cache) error {
-	return deployAction(mctx, cache, step.host, "boot")
+func (step DeployBoot) Run(mctx *common.MorphContext, cache_ *cache.Cache) error {
+	return deployAction(mctx, cache_, step.host, "boot")
 }
 
-func (step DeployDryActivate) Run(mctx *common.MorphContext, cache *planner.Cache) error {
-	return deployAction(mctx, cache, step.host, "dry-activate")
+func (step DeployDryActivate) Run(mctx *common.MorphContext, cache_ *cache.Cache) error {
+	return deployAction(mctx, cache_, step.host, "dry-activate")
 }
 
-func (step DeploySwitch) Run(mctx *common.MorphContext, cache *planner.Cache) error {
-	return deployAction(mctx, cache, step.host, "switch")
+func (step DeploySwitch) Run(mctx *common.MorphContext, cache_ *cache.Cache) error {
+	return deployAction(mctx, cache_, step.host, "switch")
 }
 
-func (step DeployTest) Run(mctx *common.MorphContext, cache *planner.Cache) error {
-	return deployAction(mctx, cache, step.host, "test")
+func (step DeployTest) Run(mctx *common.MorphContext, cache_ *cache.Cache) error {
+	return deployAction(mctx, cache_, step.host, "test")
 }
 
 type DefaultPlanExecutor struct {
@@ -119,7 +121,7 @@ type DefaultPlanExecutor struct {
 	MorphContext *common.MorphContext
 	SSHContext   *ssh.SSHContext
 	NixContext   *nix.NixContext
-	Cache        planner.Cache
+	Cache        cache.Cache
 }
 
 func (ex DefaultPlanExecutor) GetHosts() map[string]nix.Host {
@@ -144,7 +146,7 @@ func (ex DefaultPlanExecutor) GetNixContext() *nix.NixContext {
 // }
 
 func (executor DefaultPlanExecutor) Build(step planner.Step) error {
-	hostsByName := step.Action.(planner.Build).Hosts
+	hostsByName := step.Action.(actions.Build).Hosts
 
 	nixHosts := make([]nix.Host, 0)
 
@@ -171,7 +173,7 @@ func (executor DefaultPlanExecutor) Build(step planner.Step) error {
 		fmt.Println(hostPathSymlink)
 		fmt.Println(hostPath)
 
-		executor.Cache.Update(planner.StepData{Key: "closure:" + host.Name, Value: hostPath})
+		executor.Cache.Update(cache.StepData{Key: "closure:" + host.Name, Value: hostPath})
 
 		// store hostPath to be fetched by other steps
 	}
@@ -180,7 +182,7 @@ func (executor DefaultPlanExecutor) Build(step planner.Step) error {
 }
 
 func (executor DefaultPlanExecutor) Push(step planner.Step) error {
-	hostName := step.Action.(planner.Push).Host
+	hostName := step.Action.(actions.Push).Host
 	cacheKey := "closure:" + hostName
 	fmt.Println("cache key: " + cacheKey)
 	closure, err := executor.Cache.Get(cacheKey)
@@ -213,25 +215,25 @@ func (executor DefaultPlanExecutor) deployAction(action string, step planner.Ste
 }
 
 func (executor DefaultPlanExecutor) DeploySwitch(step planner.Step) error {
-	hostName := step.Action.(planner.DeploySwitch).Host
+	hostName := step.Action.(actions.DeploySwitch).Host
 
 	return executor.deployAction("switch", step, executor.GetHosts()[hostName])
 }
 
 func (executor DefaultPlanExecutor) DeployBoot(step planner.Step) error {
-	hostName := step.Action.(planner.DeployBoot).Host
+	hostName := step.Action.(actions.DeployBoot).Host
 
 	return executor.deployAction("boot", step, executor.GetHosts()[hostName])
 }
 
 func (executor DefaultPlanExecutor) DeployDryActivate(step planner.Step) error {
-	hostName := step.Action.(planner.DeployDryActivate).Host
+	hostName := step.Action.(actions.DeployDryActivate).Host
 
 	return executor.deployAction("dry-activate", step, executor.GetHosts()[hostName])
 }
 
 func (executor DefaultPlanExecutor) DeployTest(step planner.Step) error {
-	hostName := step.Action.(planner.DeployTest).Host
+	hostName := step.Action.(actions.DeployTest).Host
 
 	return executor.deployAction("test", step, executor.GetHosts()[hostName])
 }

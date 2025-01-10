@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"github.com/DBCDK/morph/actions"
 	"github.com/DBCDK/morph/healthchecks"
 )
 
@@ -28,7 +29,7 @@ func HealthChecksToCommands(checks []healthchecks.CmdHealthCheck) []CommandPlus 
 func HealthCheckToRequest(check healthchecks.HttpHealthCheck) RequestPlus {
 
 	return RequestPlus{
-		Request: Request{
+		Request: actions.Request{
 			Description: check.Description,
 			Headers:     check.Headers,
 			Host:        check.Host,

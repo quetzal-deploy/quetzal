@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/DBCDK/morph/actions"
+	"github.com/DBCDK/morph/cache"
 	"os"
 	"strings"
 
@@ -381,14 +383,14 @@ func main() {
 			return
 		}
 
-		cache := planner.NewCache()
+		cache_ := cache.NewCache()
 
 		executor := executors.DefaultPlanExecutor{
 			Hosts:        hostsMap, // FIXME: Either get rid of this, or set the hosts from a new EvalDeployment step. Each deployment will need its own executor probably.
 			MorphContext: mctx,
 			SSHContext:   ssh.CreateSSHContext(askForSudoPasswd, passCmd),
 			NixContext:   nix.GetNixContext(assetRoot, showTrace, *keepGCRoot, *allowBuildShell),
-			Cache:        cache,
+			Cache:        cache_,
 		}
 
 		err = planner.ExecutePlan(executor, plan)
@@ -427,7 +429,7 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 	for _, host := range hosts {
 		hostSpecificPlan := planner.EmptyStep()
 		hostSpecificPlan.Description = "host: " + host.Name
-		hostSpecificPlan.Action = planner.NoAction{}
+		hostSpecificPlan.Action = actions.None{}
 		hostSpecificPlan.Parallel = false
 
 		hostSpecificPlans[host.Name] = hostSpecificPlan

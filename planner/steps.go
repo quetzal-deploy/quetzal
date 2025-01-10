@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/DBCDK/morph/actions"
 	"github.com/DBCDK/morph/nix"
 	"github.com/google/uuid"
 )
@@ -17,125 +18,125 @@ type Plan struct {
 }
 
 type Step struct {
-	Id          string   `json:"id"`
-	Description string   `json:"description"`
-	ActionName  string   `json:"action"`
-	Action      Action   `json:"-"`
-	Parallel    bool     `json:"parallel"`
-	OnFailure   string   `json:"on-failure"` // retry, exit, ignore
-	Steps       []Step   `json:"steps"`
-	DependsOn   []string `json:"dependencies"`
-	CanResume   bool     `json:"can-resume"`
+	Id          string         `json:"id"`
+	Description string         `json:"description"`
+	ActionName  string         `json:"action"`
+	Action      actions.Action `json:"-"`
+	Parallel    bool           `json:"parallel"`
+	OnFailure   string         `json:"on-failure"` // retry, exit, ignore
+	Steps       []Step         `json:"steps"`
+	DependsOn   []string       `json:"dependencies"`
+	CanResume   bool           `json:"can-resume"`
 }
 
 func (step Step) MarshalJSON() ([]byte, error) {
 	type StepAlias Step
 
 	switch step.ActionName {
-	case NoAction{}.Name():
+	case actions.None{}.Name():
 		fallthrough
-	case Gate{}.Name():
+	case actions.Gate{}.Name():
 		fallthrough
-	case "wrapper": // FIXME: Either delete wrapper or create it as proper action
+	case actions.Wrapper{}.Name():
 		return json.Marshal(StepAlias(step))
 
-	case Build{}.Name():
+	case actions.Build{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			Build
+			actions.Build
 		}{
 			StepAlias: StepAlias(step),
-			Build:     step.Action.(Build),
+			Build:     step.Action.(actions.Build),
 		})
 
-	case Push{}.Name():
+	case actions.Push{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			Push
+			actions.Push
 		}{
 			StepAlias: StepAlias(step),
-			Push:      step.Action.(Push),
+			Push:      step.Action.(actions.Push),
 		})
 
-	case RepeatUntilSuccess{}.Name():
+	case actions.RepeatUntilSuccess{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			RepeatUntilSuccess
+			actions.RepeatUntilSuccess
 		}{
 			StepAlias:          StepAlias(step),
-			RepeatUntilSuccess: step.Action.(RepeatUntilSuccess),
+			RepeatUntilSuccess: step.Action.(actions.RepeatUntilSuccess),
 		})
 
-	case DeployBoot{}.Name():
+	case actions.DeployBoot{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			DeployBoot
+			actions.DeployBoot
 		}{
 			StepAlias:  StepAlias(step),
-			DeployBoot: step.Action.(DeployBoot),
+			DeployBoot: step.Action.(actions.DeployBoot),
 		})
 
-	case DeployDryActivate{}.Name():
+	case actions.DeployDryActivate{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			DeployDryActivate
+			actions.DeployDryActivate
 		}{
 			StepAlias:         StepAlias(step),
-			DeployDryActivate: step.Action.(DeployDryActivate),
+			DeployDryActivate: step.Action.(actions.DeployDryActivate),
 		})
 
-	case DeploySwitch{}.Name():
+	case actions.DeploySwitch{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			DeploySwitch
+			actions.DeploySwitch
 		}{
 			StepAlias:    StepAlias(step),
-			DeploySwitch: step.Action.(DeploySwitch),
+			DeploySwitch: step.Action.(actions.DeploySwitch),
 		})
 
-	case DeployTest{}.Name():
+	case actions.DeployTest{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			DeployTest
+			actions.DeployTest
 		}{
 			StepAlias:  StepAlias(step),
-			DeployTest: step.Action.(DeployTest),
+			DeployTest: step.Action.(actions.DeployTest),
 		})
 
-	case LocalCommandAction{}.Name():
+	case actions.LocalCommand{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			LocalCommandAction
+			actions.LocalCommand
 		}{
-			StepAlias:          StepAlias(step),
-			LocalCommandAction: step.Action.(LocalCommandAction),
+			StepAlias:    StepAlias(step),
+			LocalCommand: step.Action.(actions.LocalCommand),
 		})
 
-	case RemoteCommandAction{}.Name():
+	case actions.RemoteCommand{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			RemoteCommandAction
+			actions.RemoteCommand
 		}{
-			StepAlias:           StepAlias(step),
-			RemoteCommandAction: step.Action.(RemoteCommandAction),
+			StepAlias:     StepAlias(step),
+			RemoteCommand: step.Action.(actions.RemoteCommand),
 		})
 
-	case LocalRequestAction{}.Name():
+	case actions.LocalRequest{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			LocalRequestAction
+			actions.LocalRequest
 		}{
-			StepAlias:          StepAlias(step),
-			LocalRequestAction: step.Action.(LocalRequestAction),
+			StepAlias:    StepAlias(step),
+			LocalRequest: step.Action.(actions.LocalRequest),
 		})
 
-	case RemoteRequestAction{}.Name():
+	case actions.RemoteRequest{}.Name():
 		return json.Marshal(struct {
 			StepAlias
-			RemoteRequestAction
+			actions.RemoteRequest
 		}{
-			StepAlias:           StepAlias(step),
-			RemoteRequestAction: step.Action.(RemoteRequestAction),
+			StepAlias:     StepAlias(step),
+			RemoteRequest: step.Action.(actions.RemoteRequest),
 		})
 
 	default:
@@ -180,17 +181,17 @@ func (step *Step) UnmarshalJSON(b []byte) error {
 	// (2) Unmarshal the same into the corresponding Action and
 	// add it to the step
 	switch step.ActionName {
-	case "none":
+	case actions.None{}.Name():
 		fallthrough
-	case "gate":
+	case actions.Gate{}.Name():
 		fallthrough
-	case "wrapper":
+	case actions.Wrapper{}.Name():
 		// do nothing
 		fmt.Println("action: none")
 
-	case "build":
+	case actions.Build{}.Name():
 		fmt.Println("action: build")
-		var build Build
+		var build actions.Build
 		err = json.Unmarshal(b, &build)
 		if err != nil {
 			return err
@@ -198,9 +199,9 @@ func (step *Step) UnmarshalJSON(b []byte) error {
 
 		step.Action = build
 
-	case "push":
+	case actions.Push{}.Name():
 		fmt.Println("action: push")
-		var push Push
+		var push actions.Push
 		err = json.Unmarshal(b, &push)
 		if err != nil {
 			return err
@@ -215,170 +216,14 @@ func (step *Step) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type Action interface {
-	Name() string
-	ToMap() map[string]interface{}
-}
-
-type NoAction struct{}
-type Gate struct{}
-
-type EvalDeployment struct {
-	Deployment string `json:"deployment"`
-}
-
-type Build struct {
-	Hosts []string `json:"hosts"`
-}
-
-type Push struct {
-	Host string `json:"host"`
-}
-
-type Reboot struct {
-	Host string `json:"host"`
-}
-
-type IsOnline struct {
-	Host string `json:"host"`
-}
-
-type RepeatUntilSuccess struct {
-	Period  int `json:"period"`
-	Timeout int `json:"timeout"`
-}
-
-type ActionWithOneHost struct {
-	Host string `json:"host"`
-}
-
 type XSchedule struct {
 	Period  int
 	Timeout int
 }
 
-type LocalRequestAction struct {
-	Request Request `json:"request"`
-	Timeout int     `json:"timeout"`
-}
-
-type RemoteRequestAction struct {
-	Request Request `json:"request"`
-	Timeout int     `json:"timeout"`
-}
-
-type LocalCommandAction struct {
-	Command []string `json:"command"`
-	Timeout int      `json:"timeout"`
-}
-
-type RemoteCommandAction struct {
-	Command []string `json:"command"`
-	Timeout int      `json:"timeout"`
-}
-
-func (a ActionWithOneHost) ToMap() map[string]interface{} {
-	return justAHost(a.Host)
-}
-
-type DeployBoot struct{ ActionWithOneHost }
-type DeployDryActivate struct{ ActionWithOneHost }
-type DeploySwitch struct{ ActionWithOneHost }
-type DeployTest struct{ ActionWithOneHost }
-
-type GetSudoPasswd struct{}
-
-func (_ NoAction) Name() string            { return "none" }
-func (_ Gate) Name() string                { return "gate" }
-func (_ GetSudoPasswd) Name() string       { return "get-sudo-password" }
-func (_ EvalDeployment) Name() string      { return "eval-deployment" }
-func (_ Build) Name() string               { return "build" }
-func (_ Push) Name() string                { return "push" }
-func (_ Reboot) Name() string              { return "reboot" }
-func (_ IsOnline) Name() string            { return "is-online" }
-func (_ RepeatUntilSuccess) Name() string  { return "repeat-until-success" }
-func (_ DeployBoot) Name() string          { return "deploy-boot" }
-func (_ DeployDryActivate) Name() string   { return "deploy-dry-activate" }
-func (_ DeploySwitch) Name() string        { return "deploy-switch" }
-func (_ DeployTest) Name() string          { return "deploy-test" }
-func (_ LocalRequestAction) Name() string  { return "local-request" }
-func (_ RemoteRequestAction) Name() string { return "remote-request" }
-func (_ LocalCommandAction) Name() string  { return "local-command" }
-func (_ RemoteCommandAction) Name() string { return "remote-command" }
-
-func justNothing() map[string]interface{} {
-	obj := make(map[string]interface{})
-	return obj
-}
-
-func justAHost(host string) map[string]interface{} {
-	obj := make(map[string]interface{})
-	obj["host"] = host
-	return obj
-}
-
-func (x EvalDeployment) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
-func (x LocalCommandAction) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
-func (x RemoteCommandAction) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
-func (x LocalRequestAction) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
-func (x RemoteRequestAction) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
-func (a Gate) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
-func (a NoAction) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
-func (a GetSudoPasswd) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
-func (a Build) ToMap() map[string]interface{} {
-	obj := make(map[string]interface{})
-	obj["hosts"] = a.Hosts
-	return obj
-}
-
-func (a Push) ToMap() map[string]interface{} {
-	return justAHost(a.Host)
-}
-
-func (a Reboot) ToMap() map[string]interface{} {
-	return justAHost(a.Host)
-}
-
-func (a IsOnline) ToMap() map[string]interface{} {
-	return justAHost(a.Host)
-}
-
-func (a RepeatUntilSuccess) ToMap() map[string]interface{} {
-	return justNothing()
-}
-
 type StepStatus struct {
 	Id     string
 	Status string
-}
-
-type StepData struct {
-	Key   string
-	Value string
 }
 
 type Command struct {
@@ -392,23 +237,13 @@ type CommandPlus struct {
 	Timeout int
 }
 
-type Request struct {
-	Description string            `json:"description"`
-	Headers     map[string]string `json:"headers"`
-	Host        *string           `json:"host"`
-	InsecureSSL bool              `json:"insecureSSL"`
-	Path        string            `json:"path"`
-	Port        int               `json:"port"`
-	Scheme      string            `json:"scheme"`
-}
-
 type RequestPlus struct {
-	Request Request
+	Request actions.Request
 	Period  int
 	Timeout int
 }
 
-func CreateStep(description string, actionName string, action Action, parallel bool, steps []Step, onFailure string, dependencies []string) Step {
+func CreateStep(description string, actionName string, action actions.Action, parallel bool, steps []Step, onFailure string, dependencies []string) Step {
 	step := Step{
 		Id:          uuid.New().String(),
 		Description: description,
@@ -481,7 +316,7 @@ func CreateBuildPlan(hosts []nix.Host) Step {
 		hostNames = append(hostNames, host.Name)
 	}
 
-	action := Build{
+	action := actions.Build{
 		Hosts: hostNames,
 	}
 
@@ -500,7 +335,7 @@ func CreateStepGetSudoPasswd() Step {
 	step := EmptyStep()
 	step.Description = "Get sudo password"
 	step.ActionName = "get-sudo-passwd"
-	step.Action = GetSudoPasswd{}
+	step.Action = actions.GetSudoPasswd{}
 	step.CanResume = false
 
 	return step
@@ -515,7 +350,7 @@ func CreateStepSkip(skippedStep Step) Step {
 }
 
 func CreateStepPush(host nix.Host) Step {
-	push := Push{
+	push := actions.Push{
 		Host: host.Name,
 	}
 
@@ -526,7 +361,7 @@ func CreateStepPush(host nix.Host) Step {
 }
 
 func CreatePushPlan(buildId string, hosts []nix.Host) Step {
-	pushParent := CreateStep("push to hosts", "none", NoAction{}, true, EmptySteps(), "exit", MakeDependencies(buildId))
+	pushParent := CreateStep("push to hosts", "none", actions.None{}, true, EmptySteps(), "exit", MakeDependencies(buildId))
 
 	for _, host := range hosts {
 		pushParent = AddSteps(
@@ -603,7 +438,7 @@ func CreateStepReboot(host nix.Host) Step {
 	step := EmptyStep()
 	step.Description = "reboot " + host.Name
 	step.ActionName = "reboot"
-	step.Action = Reboot{Host: host.Name}
+	step.Action = actions.Reboot{Host: host.Name}
 
 	return step
 }
@@ -612,7 +447,7 @@ func CreateStepReboot(host nix.Host) Step {
 func CreateStepIsOnline(host nix.Host) Step {
 	step := EmptyStep()
 	step.ActionName = "is-online"
-	step.Action = IsOnline{Host: host.Name}
+	step.Action = actions.IsOnline{Host: host.Name}
 	step.Description = "test if " + host.Name + " is online"
 
 	command := Command{
@@ -628,7 +463,7 @@ func CreateStepIsOnline(host nix.Host) Step {
 func CreateStepWaitForOnline(host nix.Host) Step {
 	step := EmptyStep()
 	step.ActionName = "wait-for-online"
-	step.Action = NoAction{}
+	step.Action = actions.None{}
 	step.Description = fmt.Sprintf("Wait for %s to come online", host.Name)
 
 	timeout := 5
@@ -645,7 +480,7 @@ func CreateStepWaitForOnline(host nix.Host) Step {
 func CreateStepRepeatUntilSuccess(period int, timeout int) Step {
 	step := EmptyStep()
 	step.ActionName = "repeat-until-success"
-	step.Action = RepeatUntilSuccess{
+	step.Action = actions.RepeatUntilSuccess{
 		Period:  timeout, // FIXME: ???
 		Timeout: timeout,
 	}
@@ -657,7 +492,7 @@ func CreateStepRepeatUntilSuccess(period int, timeout int) Step {
 func CreateStepGate(description string) Step {
 	step := EmptyStep()
 	step.ActionName = "gate"
-	step.Action = Gate{}
+	step.Action = actions.Gate{}
 	step.Description = description
 	step.Parallel = true
 	step.OnFailure = "retry"
@@ -680,7 +515,7 @@ func createStepCommand(location string, host nix.Host, command Command) Step {
 	}
 
 	step.Description = command.Description
-	step.Action = RemoteCommandAction{
+	step.Action = actions.RemoteCommand{
 		Command: command.Command,
 		Timeout: 0,
 	}
@@ -699,11 +534,11 @@ func CreateStepRemoteCommand(host nix.Host, command Command) Step {
 // HTTP requests
 
 // FIXME: Get rid of the health check types
-func CreateStepLocalHttpRequest(host nix.Host, req Request) Step {
+func CreateStepLocalHttpRequest(host nix.Host, req actions.Request) Step {
 	step := EmptyStep()
 
 	step.Description = req.Description
-	step.Action = LocalRequestAction{
+	step.Action = actions.LocalRequest{
 		Request: req,
 		Timeout: 0,
 	}
@@ -713,11 +548,11 @@ func CreateStepLocalHttpRequest(host nix.Host, req Request) Step {
 }
 
 // FIXME: Get rid of the health check types
-func CreateStepRemoteHttpRequest(host nix.Host, req Request) Step {
+func CreateStepRemoteHttpRequest(host nix.Host, req actions.Request) Step {
 	step := EmptyStep()
 
 	step.Description = req.Description
-	step.Action = RemoteRequestAction{
+	step.Action = actions.RemoteRequest{
 		Request: req,
 		Timeout: 0,
 	}
@@ -728,7 +563,7 @@ func CreateStepRemoteHttpRequest(host nix.Host, req Request) Step {
 
 // deploy wrappers
 
-func createStepDeploy(deployAction Action, host nix.Host, dependencies ...Step) Step {
+func createStepDeploy(deployAction actions.Action, host nix.Host, dependencies ...Step) Step {
 	step := EmptyStep()
 	step.Id = deployId(host)
 	step.Description = "deploy " + host.Name
@@ -744,19 +579,19 @@ func createStepDeploy(deployAction Action, host nix.Host, dependencies ...Step) 
 }
 
 func CreateStepDeployBoot(host nix.Host, dependencies ...Step) Step {
-	return createStepDeploy(DeployBoot{ActionWithOneHost{Host: host.Name}}, host, dependencies...)
+	return createStepDeploy(actions.DeployBoot{actions.ActionWithOneHost{Host: host.Name}}, host, dependencies...)
 }
 
 func CreateStepDeployDryActivate(host nix.Host, dependencies ...Step) Step {
-	return createStepDeploy(DeployDryActivate{ActionWithOneHost{Host: host.Name}}, host, dependencies...)
+	return createStepDeploy(actions.DeployDryActivate{actions.ActionWithOneHost{Host: host.Name}}, host, dependencies...)
 }
 
 func CreateStepDeploySwitch(host nix.Host, dependencies ...Step) Step {
-	return createStepDeploy(DeploySwitch{ActionWithOneHost{Host: host.Name}}, host, dependencies...)
+	return createStepDeploy(actions.DeploySwitch{actions.ActionWithOneHost{Host: host.Name}}, host, dependencies...)
 }
 
 func CreateStepDeployTest(host nix.Host, dependencies ...Step) Step {
-	return createStepDeploy(DeployTest{ActionWithOneHost{Host: host.Name}}, host, dependencies...)
+	return createStepDeploy(actions.DeployTest{actions.ActionWithOneHost{Host: host.Name}}, host, dependencies...)
 }
 
 // dot file output
@@ -782,7 +617,7 @@ func CreateDotBla(writer *bufio.Writer, step Step) {
 	case "skip":
 		writer.WriteString(fmt.Sprintf("\t\"%s\"[label = \"<f0> skipped | <f1> %s\", shape=record, color=grey64, style=\"rounded,dashed\"]\n", step.Id, step.Description))
 	case "build":
-		hostsByName := step.Action.(Build).Hosts
+		hostsByName := step.Action.(actions.Build).Hosts
 
 		writer.WriteString(fmt.Sprintf("\t\"%s\"[label = \"<f0> build | <f1> %s", step.Id, step.Description))
 		for i, host := range hostsByName {
