@@ -2,13 +2,13 @@ package planner
 
 import (
 	"fmt"
-	"strings"
-	"sync"
-	"time"
-
+	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/ssh"
+	"strings"
+	"sync"
+	"time"
 )
 
 var (
@@ -16,65 +16,33 @@ var (
 	stepsDoneChan = make(chan StepStatus)
 )
 
-type PlanExecutor interface {
-	GetMorphContext() *common.MorphContext // FIXME: Get rid of this or limit it a lot
-	GetSSHContext() *ssh.SSHContext
-	GetNixContext() *nix.NixContext
+// FIXME: IDEA: Deployment simulation - make a fake MorphContext where things like SSH-calls are faked and logged instead
 
-	GetHosts() map[string]nix.Host
-
-	Build(step Step) error
-	Push(step Step) error
-	DeploySwitch(step Step) error
-	DeployBoot(step Step) error
-	DeployDryActivate(step Step) error
-	DeployTest(step Step) error
-	Reboot(step Step) error
-	CommandCheckLocal(step Step) error
-	CommandCheckRemote(step Step) error
-	HttpCheckLocal(step Step) error
-	HttpCheckRemote(step Step) error
+type MegaContext struct { // FIXME: Lol get rid of this
+	Hosts        map[string]nix.Host
+	MorphContext *common.MorphContext
+	SSHContext   *ssh.SSHContext
+	NixContext   *nix.NixContext
+	Cache        *cache.Cache
 }
 
-func ExecutePlan(executor PlanExecutor, plan Step) error {
+func ExecutePlan(megaCtx MegaContext, plan Step) error {
 	// THese should be started somewhere better
 	go plannerStepStatusWriter()
 
-	return ExecuteStep(executor, plan)
+	return ExecuteStep(megaCtx, plan)
 }
 
-func ExecuteStep(executor PlanExecutor, step Step) error {
+func ExecuteStep(megaCtx MegaContext, step Step) error {
 	fmt.Printf("Running step %s: %s (dependencies: %v)\n", step.ActionName, step.Description, step.DependsOn)
 
 	stepsDoneChan <- StepStatus{Id: step.Id, Status: "started"}
 
 	waitForDependencies(step.Id, "dependencies", step.DependsOn)
 
-	switch step.ActionName {
-	case "build":
-		executor.Build(step)
-
-	case "push":
-		executor.Push(step)
-
-	case "boot":
-		executor.DeployBoot(step)
-
-	case "dry-activate":
-		executor.DeployDryActivate(step)
-
-	case "switch":
-		executor.DeploySwitch(step)
-
-	case "test":
-		executor.DeployTest(step)
-
-	case "none":
-		fallthrough
-	case "skip":
-		fallthrough
-	case "":
-		// wrapper step, nothing to do
+	err := step.Action.Run(megaCtx.MorphContext, megaCtx.Hosts, megaCtx.Cache)
+	if err != nil {
+		return err
 	}
 
 	if step.Parallel {
@@ -84,7 +52,7 @@ func ExecuteStep(executor PlanExecutor, step Step) error {
 			wg.Add(1)
 			go func(step Step) {
 				defer wg.Done()
-				ExecuteStep(executor, step)
+				ExecuteStep(megaCtx, step)
 			}(subStep)
 		}
 
@@ -93,7 +61,7 @@ func ExecuteStep(executor PlanExecutor, step Step) error {
 
 	} else {
 		for _, subStep := range step.Steps {
-			ExecuteStep(executor, subStep)
+			ExecuteStep(megaCtx, subStep)
 		}
 	}
 

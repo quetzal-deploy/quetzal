@@ -1,5 +1,10 @@
 package main
 
+// TODO: JSON logging  (https://github.com/uber-go/zap)
+// -> Work on matrix can continue
+// Test VM's needed for matrix
+// Morph self can use NixOS integration tests
+
 import (
 	"bufio"
 	"encoding/json"
@@ -13,7 +18,6 @@ import (
 	"github.com/DBCDK/kingpin"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/cruft"
-	"github.com/DBCDK/morph/executors"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/planner"
 	"github.com/DBCDK/morph/ssh"
@@ -385,15 +389,15 @@ func main() {
 
 		cache_ := cache.NewCache()
 
-		executor := executors.DefaultPlanExecutor{
-			Hosts:        hostsMap, // FIXME: Either get rid of this, or set the hosts from a new EvalDeployment step. Each deployment will need its own executor probably.
+		megaContext := planner.MegaContext{
+			Hosts:        hostsMap, // FIXME: Either get rid of this, or set the hosts from a new EvalDeployment step. Each deployment will need its own megaContext probably.
 			MorphContext: mctx,
 			SSHContext:   ssh.CreateSSHContext(askForSudoPasswd, passCmd),
 			NixContext:   nix.GetNixContext(assetRoot, showTrace, *keepGCRoot, *allowBuildShell),
-			Cache:        cache_,
+			Cache:        &cache_,
 		}
 
-		err = planner.ExecutePlan(executor, plan)
+		err = planner.ExecutePlan(megaContext, plan)
 		if err != nil {
 			panic(err)
 		}

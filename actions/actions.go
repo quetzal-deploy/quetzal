@@ -10,7 +10,3 @@ type Action interface {
 	Name() string
 	Run(mctx *common.MorphContext, hosts map[string]nix.Host, cache_ *cache.Cache) error // FIXME: look at morph-rs into what should be returned, and consider adding Step as parameter
 }
-
-type ActionWithOneHost struct {
-	Host string `json:"host"`
-}
