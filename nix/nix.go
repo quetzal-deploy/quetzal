@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -21,14 +22,21 @@ import (
 	"github.com/DBCDK/morph/utils"
 )
 
-type PrefixWriter struct {
-	prefix      []byte
-	destination io.Writer
+type CmdWriter struct {
+	host string
 }
 
-func (prefixWriter PrefixWriter) Write(inputBytes []byte) (n int, err error) {
-	bytes := append(prefixWriter.prefix, inputBytes...)
-	return prefixWriter.destination.Write(bytes)
+func (cmdWriter CmdWriter) Write(inputBytes []byte) (n int, err error) {
+	msg := string(inputBytes)
+	// A newline will always be included as suffix. Unless removed, this will
+	// lead to always printing an empty line at the end.
+	msg = strings.TrimSuffix(msg, "\n")
+	lines := strings.Split(msg, "\n")
+
+	for _, line := range lines {
+		log.Info().Str("host", cmdWriter.host).Msg(line)
+	}
+	return len(inputBytes), nil // This is obviously a lie..
 }
 
 type Host struct {
@@ -444,17 +452,12 @@ func (ctx *NixContext) BuildMachines(deploymentPath string, hosts []Host, nixArg
 
 	var cmd *exec.Cmd
 	if ctx.AllowBuildShell && buildShell != nil {
-
 		shellArgs := strings.Join(append([]string{ctx.BuildCmd}, NixBuildInvocationArgs.ToNixBuildArgs()...), " ")
 		cmd = exec.Command(ctx.ShellCmd, *buildShell, "--pure", "--run", shellArgs)
 	} else {
 		cmd = exec.Command(ctx.BuildCmd, NixBuildInvocationArgs.ToNixBuildArgs()...)
-
 	}
 
-	// show process output on attached stdout/stderr
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
 	utils.AddFinalizer(func() {
 		if (cmd.ProcessState == nil || !cmd.ProcessState.Exited()) && cmd.Process != nil {
 			_ = cmd.Process.Signal(syscall.SIGTERM)
@@ -464,6 +467,8 @@ func (ctx *NixContext) BuildMachines(deploymentPath string, hosts []Host, nixArg
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, fmt.Sprintf("MORPH_ARGS=%s", jsonArgs))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("MORPH_ARGS_FILE=%s", argsFile))
+
+	zLogCmd("localhost", cmd)
 	err = cmd.Run()
 
 	if err != nil {
@@ -514,6 +519,23 @@ func GetPathsToPush(host Host, resultPath string) (paths []string, err error) {
 	return paths, nil
 }
 
+// FIXME: Move function and take Step/Action as argument
+func zLogCmd(host string, cmd *exec.Cmd) {
+	writer := CmdWriter{host: host}
+
+	cmd.Stdout = writer
+	cmd.Stderr = writer
+
+	zLogCmd := zerolog.Arr().Str(cmd.Path)
+	for _, arg := range cmd.Args {
+		zLogCmd.Str(arg)
+	}
+
+	log.Info().
+		Array("command", zLogCmd).
+		Msg("running nix-copy-closure")
+}
+
 func Push(ctx *ssh.SSHContext, host Host, paths ...string) (err error) {
 	utils.ValidateEnvironment("ssh")
 
@@ -556,12 +578,10 @@ func Push(ctx *ssh.SSHContext, host Host, paths ...string) (err error) {
 		cmd := exec.Command(
 			"nix-copy-closure", args...,
 		)
+		zLogCmd(host.TargetHost, cmd)
+
 		cmd.Env = env
 
-		writer := PrefixWriter{prefix: []byte(host.TargetHost + ": "), destination: os.Stderr}
-
-		cmd.Stdout = writer
-		cmd.Stderr = writer
 		err = cmd.Run()
 
 		if err != nil {

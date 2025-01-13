@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
@@ -15,7 +16,7 @@ func (_ Push) Name() string {
 	return "push"
 }
 
-func (step Push) Run(mctx *common.MorphContext, hosts map[string]nix.Host, cache_ *cache.Cache) error {
+func (step Push) Run(ctx context.Context, mctx *common.MorphContext, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	cacheKey := "closure:" + step.Host
 	fmt.Println("cache key: " + cacheKey)
 	closure, err := cache_.Get(cacheKey)

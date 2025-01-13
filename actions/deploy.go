@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/DBCDK/morph/cache"
@@ -30,43 +31,43 @@ func (_ DeployDryActivate) Name() string { return "deploy-dry-activate" }
 func (_ DeploySwitch) Name() string      { return "deploy-switch" }
 func (_ DeployTest) Name() string        { return "deploy-test" }
 
-func (step DeployBoot) Run(mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.Cache) error {
+func (step DeployBoot) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[step.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", step.Host))
 	}
 
-	return deploy(mctx, cache_, host, "test")
+	return deploy(ctx, mctx, cache_, host, "boot")
 }
 
-func (step DeployDryActivate) Run(mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.Cache) error {
+func (step DeployDryActivate) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[step.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", step.Host))
 	}
 
-	return deploy(mctx, cache_, host, "test")
+	return deploy(ctx, mctx, cache_, host, "dry-activate")
 }
 
-func (step DeploySwitch) Run(mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.Cache) error {
+func (step DeploySwitch) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[step.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", step.Host))
 	}
 
-	return deploy(mctx, cache_, host, "test")
+	return deploy(ctx, mctx, cache_, host, "switch")
 }
 
-func (step DeployTest) Run(mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.Cache) error {
+func (step DeployTest) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[step.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", step.Host))
 	}
 
-	return deploy(mctx, cache_, host, "test")
+	return deploy(ctx, mctx, cache_, host, "test")
 }
 
-func deploy(mctx *common.MorphContext, cache_ *cache.Cache, host nix.Host, deployAction string) error {
+func deploy(ctx context.Context, mctx *common.MorphContext, cache_ *cache.LockedMap[string], host nix.Host, deployAction string) error {
 	fmt.Fprintf(os.Stderr, "Executing %s on %s", deployAction, host.Name)
 
 	closure, err := cache_.Get("closure:" + host.Name)

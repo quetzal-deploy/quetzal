@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,7 +70,6 @@ func execListSecrets(hosts []nix.Host) {
 			for name, secret := range host.Secrets {
 				fmt.Fprintf(os.Stdout, "%s:\n- %v\n", name, &secret)
 			}
-			fmt.Fprintf(os.Stdout, "\n")
 		}
 	}
 }
@@ -140,11 +141,26 @@ func GetHosts(mctx *common.MorphContext, deploymentPath string) (hosts []nix.Hos
 
 	filteredHosts := filter.FilterHosts(sortedHosts, mctx.SelectSkip, mctx.SelectEvery, mctx.SelectLimit)
 
-	fmt.Fprintf(os.Stderr, "Selected %v/%v hosts (name filter:-%v, limits:-%v):\n", len(filteredHosts), len(deployment.Hosts), len(deployment.Hosts)-len(matchingHosts), len(matchingHosts)-len(filteredHosts))
-	for index, host := range filteredHosts {
-		fmt.Fprintf(os.Stderr, "\t%3d: %s (secrets: %d, health checks: %d, tags: %s)\n", index, host.Name, len(host.Secrets), len(host.HealthChecks.Cmd)+len(host.HealthChecks.Http), strings.Join(host.GetTags(), ","))
+	zLogHostsDict := zerolog.Dict()
+	for _, host := range filteredHosts {
+		zLogTagsArray := zerolog.Arr()
+		for _, tag := range host.GetTags() {
+			zLogTagsArray.Str(tag)
+		}
+
+		zLogHostsDict.Dict(
+			host.Name,
+			zerolog.Dict().
+				Int("secrets", len(host.Secrets)).
+				Int("health_checks", len(host.HealthChecks.Cmd)+len(host.HealthChecks.Http)).
+				Array("tags", zLogTagsArray))
+
 	}
-	fmt.Fprintln(os.Stderr)
+
+	log.Info().
+		Str("event", "deployment").
+		Dict("hosts", zLogHostsDict).
+		Msg("read deployment")
 
 	return filteredHosts, nil
 }
@@ -175,8 +191,7 @@ func buildHosts(mctx *common.MorphContext, hosts []nix.Host) (resultPath string,
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "nix result path: ")
-	fmt.Println(resultPath)
+	log.Info().Msg("nix result path: " + resultPath)
 	return
 }
 

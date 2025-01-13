@@ -1,19 +1,24 @@
 package planner
 
 import (
+	"context"
 	"fmt"
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/ssh"
-	"strings"
-	"sync"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"sort"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
-var (
-	stepsDone     = make(map[string]*sync.WaitGroup)
-	stepsDoneChan = make(chan StepStatus)
+const (
+	Scheduled string = "scheduled"
+	Running   string = "running"
+	Done      string = "done"
 )
 
 // FIXME: IDEA: Deployment simulation - make a fake MorphContext where things like SSH-calls are faked and logged instead
@@ -23,90 +28,143 @@ type MegaContext struct { // FIXME: Lol get rid of this
 	MorphContext *common.MorphContext
 	SSHContext   *ssh.SSHContext
 	NixContext   *nix.NixContext
-	Cache        *cache.Cache
+	Cache        *cache.LockedMap[string]
+	StepsDone    *cache.LockedMap[string]
+	Steps        *cache.LockedMap[Step]
+	//State tilføj steps and bla bla, stat
 }
 
-func ExecutePlan(megaCtx MegaContext, plan Step) error {
-	// THese should be started somewhere better
-	go plannerStepStatusWriter()
-
-	return ExecuteStep(megaCtx, plan)
+type ExecutionState struct {
+	Steps     *cache.LockedMap[Step]
+	StepsDone *cache.LockedMap[string]
 }
 
-func ExecuteStep(megaCtx MegaContext, step Step) error {
-	fmt.Printf("Running step %s: %s (dependencies: %v)\n", step.ActionName, step.Description, step.DependsOn)
+func (mega *MegaContext) UpdateStepStatus(stepId string, status string) {
+	log.Info().
+		Str("event", "step-status").
+		Str("step", stepId).
+		Str("status", status).
+		Msg("step update")
 
-	stepsDoneChan <- StepStatus{Id: step.Id, Status: "started"}
+	mega.StepsDone.Update(stepId, status)
+}
 
-	waitForDependencies(step.Id, "dependencies", step.DependsOn)
+func StepMonitor(stepsDb *cache.LockedMap[Step], m *cache.LockedMap[string]) {
+	for {
+		data := m.GetCopy()
 
-	err := step.Action.Run(megaCtx.MorphContext, megaCtx.Hosts, megaCtx.Cache)
+		stepIds := make([]string, 0)
+		for stepId, _ := range data {
+			stepIds = append(stepIds, stepId)
+		}
+
+		sort.Strings(stepIds)
+
+		for _, stepId := range stepIds {
+			step, _ := stepsDb.Get(stepId)
+			log.Debug().
+				Dict("step", zerolog.Dict().
+					Str("id", step.Id).
+					Str("action", step.ActionName)).
+				Msg(fmt.Sprintf("step: " + stepId + " state: " + data[stepId]))
+		}
+
+		time.Sleep(time.Second)
+	}
+}
+
+func ExecuteStep(ctx context.Context, megaCtx MegaContext, step Step) error {
+	megaCtx.Steps.Update(step.Id, step)
+
+	megaCtx.UpdateStepStatus(step.Id, Scheduled)
+	waitForDependencies(megaCtx, step.Id, "dependencies", step.DependsOn)
+	megaCtx.UpdateStepStatus(step.Id, Running)
+
+	err := step.Action.Run(ctx, megaCtx.MorphContext, megaCtx.Hosts, megaCtx.Cache)
 	if err != nil {
 		return err
 	}
 
 	if step.Parallel {
-		var wg sync.WaitGroup
+		group, ctx := errgroup.WithContext(ctx)
 
 		for _, subStep := range step.Steps {
-			wg.Add(1)
-			go func(step Step) {
-				defer wg.Done()
-				ExecuteStep(megaCtx, step)
-			}(subStep)
+			step := subStep
+
+			group.Go(func() error {
+				err := ExecuteStep(ctx, megaCtx, step)
+				if err != nil {
+					// FIXME: How do we return err since we're now in a go-routine?
+					//panic(fmt.Sprintf("error in step id='%s' action='%s': %s", step.Id, step.ActionName, err))
+					return err
+				}
+				return nil
+			})
 		}
 
 		// Wait for children to all be ready, before making the current step ready
-		wg.Wait()
+		if err := group.Wait(); err != nil {
+			return err
+		}
 
 	} else {
 		for _, subStep := range step.Steps {
-			ExecuteStep(megaCtx, subStep)
+			err := ExecuteStep(ctx, megaCtx, subStep)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	stepsDoneChan <- StepStatus{Id: step.Id, Status: "done"}
+	megaCtx.UpdateStepStatus(step.Id, Done)
 
 	return nil
 }
 
-func plannerStepStatusWriter() {
-	for stepStatus := range stepsDoneChan {
-		fmt.Printf("step update: %s = %s\n", stepStatus.Id, stepStatus.Status)
-		switch strings.ToLower(stepStatus.Status) {
-		case "started":
-			var stepWg = &sync.WaitGroup{}
-			stepWg.Add(1)
-
-			stepsDone[stepStatus.Id] = stepWg
-		case "done":
-			stepsDone[stepStatus.Id].Done()
-
-		default:
-			panic("Only status=started and status=done allowed")
-		}
+func waitForDependencies(megaContext MegaContext, id string, hint string, dependencies []string) {
+	if len(dependencies) == 0 {
+		return
 	}
-}
 
-func waitForDependencies(id string, hint string, dependencies []string) {
-	fmt.Printf("%s: depends on %d steps: %v\n", id, len(dependencies), dependencies)
+	dependenciesStillWaiting := make([]string, 0)
 
 	for _, dependency := range dependencies {
-		for {
-			// Wait for the dependency to actually start running
-			// It's probably better to pre-create all dependencies so this isn't necessary
-			fmt.Printf("%s: %s: waiting for %s to start\n", id, hint, dependency)
+		dependenciesStillWaiting = append(dependenciesStillWaiting, dependency)
+	}
 
-			if dependencyWg, dependencyStarted := stepsDone[dependency]; dependencyStarted {
-				// Wait for dependency to finish runningCheck if the dependencies update channel has been closed (=> it's done), and break the loop
-				dependencyWg.Wait()
-				fmt.Printf("%s: %s: %s done\n", id, hint, dependency)
-				break
+	fmt.Printf("%s: depends on %d steps: %v\n", id, len(dependencies), dependencies)
 
-			}
-
-			// Sleep if we haven't seen the dependency
-			time.Sleep(1 * time.Second)
+	for {
+		if len(dependenciesStillWaiting) == 0 {
+			break
 		}
+
+		zLogWaitingDependencies := zerolog.Arr()
+
+		for _, dependency := range dependenciesStillWaiting {
+			zLogWaitingDependencies.Str(dependency)
+		}
+
+		log.Info().
+			Str("event", "step-blocked").
+			Str("step", id).
+			Array("blocked-by", zLogWaitingDependencies).
+			Msg("step blocked by dependencies")
+
+		dependenciesStillWaiting = make([]string, 0)
+
+		for _, dependency := range dependencies { // FIXME: optimize by only looking at dependenciesStillWaiting
+			status, err := megaContext.StepsDone.Get(dependency)
+			if err != nil {
+				// Not started
+				dependenciesStillWaiting = append(dependenciesStillWaiting, dependency)
+			} else {
+				if status != Done {
+					dependenciesStillWaiting = append(dependenciesStillWaiting, dependency)
+				}
+			}
+		}
+
+		time.Sleep(1 * time.Second)
 	}
 }

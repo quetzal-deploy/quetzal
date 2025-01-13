@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
@@ -20,10 +21,10 @@ type RemoteCommand struct {
 func (_ LocalCommand) Name() string  { return "local-command" }
 func (_ RemoteCommand) Name() string { return "remote-command" }
 
-func (step LocalCommand) Run(mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.Cache) error {
+func (step LocalCommand) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return errors.New("not implemented: " + step.Name())
 }
 
-func (step RemoteCommand) Run(mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.Cache) error {
+func (step RemoteCommand) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return errors.New("not implemented: " + step.Name())
 }

@@ -1,44 +1,74 @@
 package cache
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"github.com/rs/zerolog/log"
+	"sync"
+)
 
 type StepData struct {
 	Key   string
 	Value string
 }
 
-type Cache struct {
-	data    map[string]string
-	channel chan StepData
+type LockedMap[T any] struct {
+	identifier string
+	mutex      sync.RWMutex
+	data       map[string]T
 }
 
-func NewCache() Cache {
-	cache := Cache{
-		data:    make(map[string]string),
-		channel: make(chan StepData),
+//type Cache struct {
+//	mutex sync.RWMutex
+//	data  map[string]string
+//}
+
+func NewLockedMap[T any](identifier string) LockedMap[T] {
+	return LockedMap[T]{
+		identifier: identifier,
+		mutex:      sync.RWMutex{},
+		data:       make(map[string]T),
 	}
-
-	go cache.run()
-
-	return cache
 }
 
-func (cache Cache) Update(msg StepData) error {
-	fmt.Printf("cache: write to channel %v\n", cache.channel)
-	cache.channel <- msg
+func (m LockedMap[T]) Update(key string, value T) error {
+	log.Info().
+		Str("event", "write-"+m.identifier).
+		Str("key", key).
+		Any("value", value).
+		Msg("write to " + m.identifier)
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.data[key] = value
 
 	return nil
 }
 
-func (cache Cache) Get(key string) (string, error) {
-	// FIXME: return error on cache miss
+func (m LockedMap[T]) Get(key string) (T, error) {
+	// FIXME: return error on m miss
 
-	return cache.data[key], nil
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	data, ok := m.data[key]
+	if ok {
+		return data, nil
+	} else {
+		return data, errors.New(fmt.Sprintf("m: miss for '%s'", key))
+	}
 }
 
-func (cache Cache) run() {
-	for update := range cache.channel {
-		fmt.Printf("cache update: %s = %s\n", update.Key, update.Value)
-		cache.data[update.Key] = update.Value
+func (m LockedMap[T]) GetCopy() map[string]T {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	dataCopy := make(map[string]T)
+
+	for key, value := range m.data {
+		dataCopy[key] = value
 	}
+
+	return dataCopy
 }

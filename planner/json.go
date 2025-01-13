@@ -97,6 +97,24 @@ func (step Step) MarshalJSON() ([]byte, error) {
 			DeployTest: step.Action.(actions.DeployTest),
 		})
 
+	case actions.IsOnline{}.Name():
+		return json.Marshal(struct {
+			StepAlias
+			actions.IsOnline
+		}{
+			StepAlias: StepAlias(step),
+			IsOnline:  step.Action.(actions.IsOnline),
+		})
+
+	case actions.Reboot{}.Name():
+		return json.Marshal(struct {
+			StepAlias
+			actions.Reboot
+		}{
+			StepAlias: StepAlias(step),
+			Reboot:    step.Action.(actions.Reboot),
+		})
+
 	case actions.LocalCommand{}.Name():
 		return json.Marshal(struct {
 			StepAlias

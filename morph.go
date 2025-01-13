@@ -1,27 +1,29 @@
 package main
 
-// TODO: JSON logging  (https://github.com/uber-go/zap)
-// -> Work on matrix can continue
-// Test VM's needed for matrix
-// Morph self can use NixOS integration tests
-
+// TODO: Morph NixOS integration tests
+// TODO: turn all `panic`'s into proper error handling
+// TODO: remove --passwd since morph can then ignore stdin and doesn't have to figure out how to share it between steps
+// TODO: 12:14AM ERR error marshalling plan to JSON error="json: error calling MarshalJSON for type planner.Step: json: error calling MarshalJSON for type planner.Step: json: error calling MarshalJSON for type planner.Step: unmarshall: unknown action: wait-for-online"
+//     ^ drop wait-for-online and let it be a repeating gate/step kinda thing that calls IsOnline
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/DBCDK/kingpin"
 	"github.com/DBCDK/morph/actions"
 	"github.com/DBCDK/morph/cache"
-	"os"
-	"strings"
-
-	"github.com/DBCDK/kingpin"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/cruft"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/planner"
 	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/utils"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"os"
+	"strings"
 )
 
 // These are set at build time via -ldflags magic
@@ -34,6 +36,7 @@ var planActions = []string{"run", "resume"}
 var (
 	app                 = kingpin.New("morph", "NixOS host manager").Version(version)
 	dryRun              = app.Flag("dry-run", "Don't do anything, just eval and print changes").Default("False").Bool()
+	jsonOutput          = app.Flag("i-know-kung-fu", "Output as JSON").Default("False").Bool()
 	selectGlob          string
 	selectTags          string
 	selectEvery         int
@@ -293,6 +296,7 @@ func setup() {
 }
 
 func main() {
+
 	// TODO: Implement "context" part of a plan is running on:
 	// Default context = local
 	// A context can change the host something is running on
@@ -302,9 +306,18 @@ func main() {
 
 	clause := kingpin.MustParse(app.Parse(os.Args[1:]))
 
+	if !*jsonOutput {
+		log.Logger = log.Output(zerolog.ConsoleWriter{
+			Out: os.Stderr,
+		})
+	} else {
+		//log.Logger = log.Output(zerolog.New(os.Stdout).With().Timestamp().Logger())
+		log.Logger = log.Output(os.Stdout)
+	}
+
 	//TODO: Remove deprecation warning when removing --build-arg flag
 	if len(nixBuildArg) > 0 {
-		fmt.Fprintln(os.Stderr, "Deprecation: The --build-arg flag will be removed in a future release.")
+		log.Warn().Msg("Deprecation: The --build-arg flag will be removed in a future release.")
 	}
 
 	defer utils.RunFinalizers()
@@ -345,10 +358,16 @@ func main() {
 
 	switch clause {
 	case _planRun.FullCommand():
-		fmt.Printf("running plan: %s", planFile)
+		// FIXME: embed plan instead of file path
+		log.Info().
+			Str("plan", planFile).
+			Msg("running plan")
 
 	case _planResume.FullCommand():
-		fmt.Printf("resuming  plan: %s", planFile)
+		// FIXME: embed plan instead of file path
+		log.Info().
+			Str("plan", planFile).
+			Msg("resuming plan")
 
 	default:
 		// setup hosts
@@ -363,12 +382,18 @@ func main() {
 
 		plan := createPlan(hosts, clause)
 
-		planJson, err := json.MarshalIndent(plan, "", "  ")
+		planJson, err := json.Marshal(plan)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("hest")
+			//fmt.Println(err)
+			log.Error().Err(err).Msg("error marshalling plan to JSON")
 			return
 		}
-		fmt.Println(string(planJson))
+
+		log.Info().
+			Str("event", "plan").
+			RawJSON("plan", planJson).
+			Msg("Generated plan")
 
 		if dotFile != nil && *dotFile != "" {
 			f, err := os.Create(*dotFile)
@@ -387,7 +412,9 @@ func main() {
 			return
 		}
 
-		cache_ := cache.NewCache()
+		cache_ := cache.NewLockedMap[string]("cache")
+		stepsDone := cache.NewLockedMap[string]("steps-done")
+		stepsDb := cache.NewLockedMap[planner.Step]("steps")
 
 		megaContext := planner.MegaContext{
 			Hosts:        hostsMap, // FIXME: Either get rid of this, or set the hosts from a new EvalDeployment step. Each deployment will need its own megaContext probably.
@@ -395,11 +422,17 @@ func main() {
 			SSHContext:   ssh.CreateSSHContext(askForSudoPasswd, passCmd),
 			NixContext:   nix.GetNixContext(assetRoot, showTrace, *keepGCRoot, *allowBuildShell),
 			Cache:        &cache_,
+			StepsDone:    &stepsDone,
+			Steps:        &stepsDb,
 		}
 
-		err = planner.ExecutePlan(megaContext, plan)
+		go planner.StepMonitor(&stepsDb, &stepsDone)
+
+		err = planner.ExecuteStep(context.TODO(), megaContext, plan)
 		if err != nil {
-			panic(err)
+			log.Error().Err(err).Msg("Error while running step") // FIXME: Log the offending step/action somehow
+			// FIXME: Dump the plan with status on what was done, and what wasn't, so it can be resumed
+			os.Exit(1)
 		}
 	}
 
@@ -439,10 +472,10 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 		hostSpecificPlans[host.Name] = hostSpecificPlan
 	}
 
-	fmt.Println("Execution plan:")
-
 	plan := planner.EmptyStep()
+	plan.Id = "root"
 	plan.Description = "Root of execution plan"
+	plan.Parallel = true
 
 	buildPlan := planner.CreateBuildPlan(hosts)
 
@@ -472,8 +505,6 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 		}
 
 	case deploy.FullCommand():
-		fmt.Println("Execution plan: deploy: Not implemented")
-
 		plan = planner.AddSteps(plan, buildPlan)
 
 		for _, host := range hosts {
@@ -567,7 +598,6 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 					healthChecks,
 				)
 			}
-
 		}
 
 	case healthCheck.FullCommand():
@@ -594,13 +624,13 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 		}
 
 	case uploadSecrets.FullCommand():
-		fmt.Println("Execution plan: upload-secrets: Not implemented")
+		log.Error().Msg("Execution plan: deploy: Not implemented")
 
 	case listSecrets.FullCommand():
-		fmt.Println("Execution plan: list-secrets: Not implemented")
+		log.Error().Msg("Execution plan: deploy: Not implemented")
 
 	case execute.FullCommand():
-		fmt.Println("Execution plan: execute: Not implemented")
+		log.Error().Msg("Execution plan: execute: Not implemented")
 
 	}
 

@@ -8,13 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type Plan struct {
-	Steps      []Step
-	StepStatus map[string]string // FIXME: Step ID's - should probably be some custom type with more data about the step that ran (like errors)
-	StepDone   map[string]bool   // FIXME: Probably don't need both this and StepStatus
-	Cache      map[string]string // FIXME: ? Data written to the cache during processing // the StepData and cacheWriter stuff should probably be formalized somehow and moved away from the specific implementation
-}
-
 type Step struct {
 	Id          string         `json:"id"`
 	Description string         `json:"description"`
@@ -165,7 +158,7 @@ func CreateStepPush(host nix.Host) Step {
 		Host: host.Name,
 	}
 
-	step := CreateStep(fmt.Sprintf("push to %s", host.Name), "push", push, true, EmptySteps(), "exit", make([]string, 0))
+	step := CreateStep(fmt.Sprintf("push to %s", host.Name), "push", push, false, EmptySteps(), "exit", make([]string, 0))
 	step.Id = pushId(host)
 
 	return step
@@ -273,7 +266,7 @@ func CreateStepIsOnline(host nix.Host) Step {
 
 func CreateStepWaitForOnline(host nix.Host) Step {
 	step := EmptyStep()
-	step.ActionName = "wait-for-online"
+	step.ActionName = "none"
 	step.Action = actions.None{}
 	step.Description = fmt.Sprintf("Wait for %s to come online", host.Name)
 
