@@ -52,15 +52,6 @@ func (step Step) MarshalJSON() ([]byte, error) {
 			Push:      step.Action.(actions.Push),
 		})
 
-	case actions.RepeatUntilSuccess{}.Name():
-		return json.Marshal(struct {
-			StepAlias
-			actions.RepeatUntilSuccess
-		}{
-			StepAlias:          StepAlias(step),
-			RepeatUntilSuccess: step.Action.(actions.RepeatUntilSuccess),
-		})
-
 	case actions.DeployBoot{}.Name():
 		return json.Marshal(struct {
 			StepAlias

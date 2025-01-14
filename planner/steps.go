@@ -9,15 +9,17 @@ import (
 )
 
 type Step struct {
-	Id          string         `json:"id"`
-	Description string         `json:"description"`
-	ActionName  string         `json:"action"`
-	Action      actions.Action `json:"-"`
-	Parallel    bool           `json:"parallel"`
-	OnFailure   string         `json:"on-failure"` // retry, exit, ignore
-	Steps       []Step         `json:"steps"`
-	DependsOn   []string       `json:"dependencies"`
-	CanResume   bool           `json:"can-resume"`
+	Id            string         `json:"id"`
+	Description   string         `json:"description"`
+	ActionName    string         `json:"action"`
+	Action        actions.Action `json:"-"`
+	Parallel      bool           `json:"parallel"`
+	OnFailure     string         `json:"on-failure"` // retry, exit, ignore
+	Timeout       int            `json:"timeout"`
+	RetryInterval int            `json:"retry-interval"` // interval between retries in case of OnFailure = "retry"
+	Steps         []Step         `json:"steps"`
+	DependsOn     []string       `json:"dependencies"`
+	CanResume     bool           `json:"can-resume"`
 }
 
 type XSchedule struct {
@@ -204,34 +206,34 @@ func CreateStepChecks(host nix.Host, localCommands []CommandPlus, remoteCommands
 
 	for _, commandPlus := range localCommands {
 		step := CreateStepLocalCommand(host, commandPlus.Command)
-		runner := CreateStepRepeatUntilSuccess(commandPlus.Period, commandPlus.Timeout)
-		runner = AddSteps(runner, step)
+		step.Timeout = commandPlus.Timeout
+		step.RetryInterval = commandPlus.Period
 
-		gate.Steps = append(gate.Steps, runner)
+		gate.Steps = append(gate.Steps, step)
 	}
 
 	for _, commandPlus := range remoteCommands {
 		step := CreateStepRemoteCommand(host, commandPlus.Command)
-		runner := CreateStepRepeatUntilSuccess(commandPlus.Period, commandPlus.Timeout)
-		runner = AddSteps(runner, step)
+		step.Timeout = commandPlus.Timeout
+		step.RetryInterval = commandPlus.Period
 
-		gate.Steps = append(gate.Steps, runner)
+		gate.Steps = append(gate.Steps, step)
 	}
 
 	for _, reqPlus := range localRequests {
 		step := CreateStepLocalHttpRequest(host, reqPlus.Request)
-		runner := CreateStepRepeatUntilSuccess(reqPlus.Period, reqPlus.Timeout)
-		runner = AddSteps(runner, step)
+		step.Timeout = reqPlus.Timeout
+		step.RetryInterval = reqPlus.Period
 
-		gate.Steps = append(gate.Steps, runner)
+		gate.Steps = append(gate.Steps, step)
 	}
 
 	for _, reqPlus := range remoteRequests {
 		step := CreateStepRemoteHttpRequest(host, reqPlus.Request)
-		runner := CreateStepRepeatUntilSuccess(reqPlus.Period, reqPlus.Timeout)
-		runner = AddSteps(runner, step)
+		step.Timeout = reqPlus.Timeout
+		step.RetryInterval = reqPlus.Period
 
-		gate.Steps = append(gate.Steps, runner)
+		gate.Steps = append(gate.Steps, step)
 
 	}
 
@@ -254,43 +256,25 @@ func CreateStepIsOnline(host nix.Host) Step {
 	step.Action = actions.IsOnline{Host: host.Name}
 	step.Description = "test if " + host.Name + " is online"
 
-	command := Command{
-		Description: "check host is online",
-		Command:     []string{"/bin/sh", "-c", "true"},
-	}
-
-	CreateStepRemoteCommand(host, command)
-
 	return step
 }
 
 func CreateStepWaitForOnline(host nix.Host) Step {
-	step := EmptyStep()
-	step.ActionName = "none"
-	step.Action = actions.None{}
-	step.Description = fmt.Sprintf("Wait for %s to come online", host.Name)
-
-	timeout := 5
-	period := 10
-
-	wait := CreateStepRepeatUntilSuccess(timeout, period)
-	wait = AddSteps(wait, CreateStepIsOnline(host))
-
-	step = AddSteps(step, wait)
+	step := CreateStepIsOnline(host)
+	step.OnFailure = "retry"
+	step.RetryInterval = 2
 
 	return step
 }
 
-func CreateStepRepeatUntilSuccess(period int, timeout int) Step {
+func CreateStepRebootAndWait(host nix.Host) Step {
 	step := EmptyStep()
-	step.ActionName = "repeat-until-success"
-	step.Action = actions.RepeatUntilSuccess{
-		Period:  timeout, // FIXME: ???
-		Timeout: timeout,
-	}
-	step.Description = fmt.Sprintf("period=%d timeout=%d", period, timeout)
+	step.Description = fmt.Sprintf("reboot '%s' and wait for it to come online", host.Name)
 
-	return step
+	reboot := CreateStepReboot(host)
+	waitForOnline := CreateStepWaitForOnline(host)
+
+	return AddStepsSeq(step, reboot, waitForOnline)
 }
 
 func CreateStepGate(description string) Step {

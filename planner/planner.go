@@ -2,6 +2,7 @@ package planner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
@@ -91,15 +92,40 @@ func ExecuteStep(ctx context.Context, megaCtx MegaContext, step Step) error {
 		for _, subStep := range step.Steps {
 			step := subStep
 
-			group.Go(func() error {
-				err := ExecuteStep(ctx, megaCtx, step)
-				if err != nil {
-					// FIXME: How do we return err since we're now in a go-routine?
-					//panic(fmt.Sprintf("error in step id='%s' action='%s': %s", step.Id, step.ActionName, err))
-					return err
-				}
-				return nil
-			})
+			switch step.OnFailure {
+			case "retry":
+				// repeat until success
+				group.Go(func() error {
+					err := errors.New("fake error")
+
+					for err != nil {
+						err = ExecuteStep(ctx, megaCtx, step)
+						if err != nil {
+							log.Error().Err(err).Msg("Error while running step (will retry)")
+						}
+					}
+
+					return nil
+				})
+
+			case "ignore":
+				// ok no matter what
+				group.Go(func() error {
+					err := ExecuteStep(ctx, megaCtx, step)
+					if err != nil {
+						log.Error().Err(err).Msg("Error while running step (ignored)")
+					}
+
+					return nil
+				})
+
+			default:
+				// return err on err
+
+				group.Go(func() error {
+					return ExecuteStep(ctx, megaCtx, step)
+				})
+			}
 		}
 
 		// Wait for children to all be ready, before making the current step ready
