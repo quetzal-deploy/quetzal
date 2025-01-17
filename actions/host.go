@@ -3,8 +3,10 @@ package actions
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
+	"github.com/DBCDK/morph/logging"
 	"github.com/DBCDK/morph/nix"
 )
 
@@ -20,7 +22,25 @@ func (_ IsOnline) Name() string { return "is-online" }
 func (_ Reboot) Name() string   { return "reboot" }
 
 func (step IsOnline) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
-	return errors.New("not implemented: " + step.Name())
+	host, ok := allHosts[step.Host]
+	if !ok {
+		return errors.New(fmt.Sprintf("host '%s' not in deployment", step.Host))
+	}
+
+	fmt.Println("hest!")
+	cmd, err := mctx.SSHContext.CmdContext(ctx, &host, "/bin/sh", "-c", "true")
+	if err != nil {
+		return err
+	}
+
+	logging.LogCmd(step.Host, cmd)
+
+	fmt.Println("hest!!")
+	err = cmd.Run()
+
+	fmt.Println("hest!!!")
+
+	return err
 }
 func (step Reboot) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, exists := allHosts[step.Host]
