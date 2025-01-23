@@ -501,6 +501,13 @@ func main() {
 }
 
 func createPlan(hosts []nix.Host, clause string) planner.Step {
+	plan := planner.EmptyStep()
+	plan.Id = "root"
+	plan.Description = "Root of execution plan"
+	plan.Parallel = true
+
+	buildPlan := planner.CreateBuildPlan(hosts)
+
 	hostSpecificPlans := make(map[string]planner.Step, 0)
 
 	for _, host := range hosts {
@@ -508,16 +515,10 @@ func createPlan(hosts []nix.Host, clause string) planner.Step {
 		hostSpecificPlan.Description = "host: " + host.Name
 		hostSpecificPlan.Action = actions.None{}
 		hostSpecificPlan.Parallel = false
+		hostSpecificPlan.DependsOn = []string{buildPlan.Id}
 
 		hostSpecificPlans[host.Name] = hostSpecificPlan
 	}
-
-	plan := planner.EmptyStep()
-	plan.Id = "root"
-	plan.Description = "Root of execution plan"
-	plan.Parallel = true
-
-	buildPlan := planner.CreateBuildPlan(hosts)
 
 	stepGetSudoPasswd := planner.CreateStepGetSudoPasswd()
 
