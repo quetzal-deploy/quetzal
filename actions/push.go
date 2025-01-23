@@ -6,6 +6,7 @@ import (
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
+	"github.com/rs/zerolog/log"
 )
 
 type Push struct {
@@ -18,13 +19,13 @@ func (_ Push) Name() string {
 
 func (step Push) Run(ctx context.Context, mctx *common.MorphContext, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	cacheKey := "closure:" + step.Host
-	fmt.Println("cache key: " + cacheKey)
+	log.Debug().Msg("cache key: " + cacheKey)
 	closure, err := cache_.Get(cacheKey)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Pushing %s to %s\n", closure, hosts[step.Host].TargetHost)
+	log.Info().Msg(fmt.Sprintf("Pushing %s to %s\n", closure, hosts[step.Host].TargetHost))
 
 	err = nix.Push(mctx.SSHContext, hosts[step.Host], closure)
 

@@ -27,7 +27,6 @@ func (step IsOnline) Run(ctx context.Context, mctx *common.MorphContext, allHost
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", step.Host))
 	}
 
-	fmt.Println("hest!")
 	cmd, err := mctx.SSHContext.CmdContext(ctx, &host, "/bin/sh", "-c", "true")
 	if err != nil {
 		return err
@@ -35,10 +34,7 @@ func (step IsOnline) Run(ctx context.Context, mctx *common.MorphContext, allHost
 
 	logging.LogCmd(step.Host, cmd)
 
-	fmt.Println("hest!!")
 	err = cmd.Run()
-
-	fmt.Println("hest!!!")
 
 	return err
 }

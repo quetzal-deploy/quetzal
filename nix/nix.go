@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/DBCDK/morph/logging"
+	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -210,7 +211,8 @@ func (host *Host) Reboot(sshContext *ssh.SSHContext) error {
 	}
 
 	if cmd, err := sshContext.Cmd(host, "sudo", "reboot"); cmd != nil {
-		fmt.Fprint(os.Stderr, "Asking host to reboot ... ")
+		log.Info().Msg("Asking host to reboot ... ")
+
 		if err = cmd.Run(); err != nil {
 			// Here we assume that exit code 255 means: "SSH connection got disconnected",
 			// which is OK for a reboot - sshd may close active connections before we disconnect after all
@@ -223,27 +225,27 @@ func (host *Host) Reboot(sshContext *ssh.SSHContext) error {
 		}
 
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed")
+			log.Info().Msg("Asking host to reboot ...: Failed ")
 			return err
 		}
 	}
 
-	fmt.Fprintln(os.Stderr, "OK")
+	log.Info().Msg("Asking host to reboot ...: OK ")
 
 	if !skipBootIDComparison {
-		fmt.Fprint(os.Stderr, "Waiting for host to come online ")
+		log.Info().Msg("Waiting for host to come online ")
 
 		// Wait for the host to get a new boot ID. These ID's should be unique for each boot,
 		// meaning a reboot will have been completed when the boot ID has changed.
 		for {
-			fmt.Fprint(os.Stderr, ".")
+			log.Info().Msg("Waiting for host to come online ")
 
 			// Ignore errors; there'll be plenty of them since we'll be attempting to connect to an offline host,
 			// and we know from previously that the host should support boot ID's
 			newBootID, _ = sshContext.GetBootID(host)
 
 			if newBootID != "" && oldBootID != newBootID {
-				fmt.Fprintln(os.Stderr, " OK")
+				log.Info().Msg("Waiting for host to come online: OK")
 				break
 			}
 
@@ -348,8 +350,8 @@ func (ctx *NixContext) GetMachines(deploymentPath string) (deployment Deployment
 	cmd := exec.Command(ctx.EvalCmd, nixEvalInvocationArgs.ToNixInstantiateArgs()...)
 
 	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = &stdout // FIXME: zlog this while still capturing stdout
+	cmd.Stderr = logging.CmdWriter{Host: ""}
 
 	utils.AddFinalizer(func() {
 		if (cmd.ProcessState == nil || !cmd.ProcessState.Exited()) && cmd.Process != nil {

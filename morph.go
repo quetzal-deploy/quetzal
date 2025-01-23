@@ -19,11 +19,13 @@ import (
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/planner"
 	"github.com/DBCDK/morph/ssh"
+	"github.com/DBCDK/morph/ui"
 	"github.com/DBCDK/morph/utils"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
 	"strings"
+	"time"
 )
 
 // These are set at build time via -ldflags magic
@@ -303,13 +305,39 @@ func main() {
 	// nix copy morph itself to the new host, and execute it with the sub-plan
 	// eg context:local -> repeat-until-success -> context:$host -> exec command (health check)
 	// Running the deploy from Matrix can also be a context, and the local morph will wait for it to finish
+	// Try substitute on remote host before building locally (to avoid downloaded things that will be substituted from cache
+	// Wrap exec.Command to unify logging the command and to give each command a unique ID that can be used to reconstruct what is being logged
+	// Find a way to log commands where host is the machine executing morph
+
+	// Metrics that can be reacted on
 
 	clause := kingpin.MustParse(app.Parse(os.Args[1:]))
 
+	// Don't actually run the UI unless activated
+	tui := ui.DoTea()
+
 	if !*jsonOutput {
+		go func() {
+			if _, err := tui.Run(); err != nil {
+				fmt.Printf("morph failed: %v", err)
+				os.Exit(1)
+			}
+		}()
+
+		tui.Send(ui.LogEvent{Data: "ping"})
+		go func() {
+			time.Sleep(time.Second)
+			tui.Send(ui.LogEvent{Data: "ping"})
+		}()
+
+		time.Sleep(time.Second)
+
 		log.Logger = log.Output(zerolog.ConsoleWriter{
-			Out: os.Stderr,
+			Out: ui.LogWriter{Program: tui},
+			//NoColor: true,
 		})
+
+		//load the UI here and redirect logs to a bubbletea pane instead
 	} else {
 		//log.Logger = log.Output(zerolog.New(os.Stdout).With().Timestamp().Logger())
 		log.Logger = log.Output(os.Stdout)
@@ -381,11 +409,12 @@ func main() {
 		}
 
 		plan := createPlan(hosts, clause)
+		if !*jsonOutput {
+			tui.Send(plan)
+		}
 
 		planJson, err := json.Marshal(plan)
 		if err != nil {
-			fmt.Println("hest")
-			//fmt.Println(err)
 			log.Error().Err(err).Msg("error marshalling plan to JSON")
 			return
 		}
@@ -424,6 +453,8 @@ func main() {
 			Cache:        &cache_,
 			StepsDone:    &stepsDone,
 			Steps:        &stepsDb,
+			UIActive:     !*jsonOutput,
+			UI:           tui,
 		}
 
 		go planner.StepMonitor(&stepsDb, &stepsDone)
@@ -432,7 +463,16 @@ func main() {
 		if err != nil {
 			log.Error().Err(err).Msg("Error while running step") // FIXME: Log the offending step/action somehow
 			// FIXME: Dump the plan with status on what was done, and what wasn't, so it can be resumed
-			os.Exit(1)
+			if *jsonOutput {
+				// don't os.Exit if running with UI
+				os.Exit(1)
+			}
+
+		}
+
+		if !*jsonOutput {
+			// Let the user terminate morph from the UI
+			tui.Wait()
 		}
 	}
 

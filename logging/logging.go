@@ -9,7 +9,7 @@ import (
 )
 
 type CmdWriter struct {
-	host string
+	Host string
 }
 
 func (cmdWriter CmdWriter) Write(inputBytes []byte) (n int, err error) {
@@ -20,17 +20,21 @@ func (cmdWriter CmdWriter) Write(inputBytes []byte) (n int, err error) {
 	lines := strings.Split(msg, "\n")
 
 	for _, line := range lines {
-		log.Info().Str("host", cmdWriter.host).Msg(line)
+		log.Info().Str("Host", cmdWriter.Host).Msg(line)
 	}
 	return len(inputBytes), nil // This is obviously a lie..
 }
 
 func LogCmd(host string, cmd *exec.Cmd) {
-	writer := CmdWriter{host: host}
+	writer := CmdWriter{Host: host}
 
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 
+	LogCommand(host, cmd)
+}
+
+func LogCommand(host string, cmd *exec.Cmd) {
 	// FIXME: This seems to log the executable twice, one with the full path, and one as name only
 	zLogCmd := zerolog.Arr().Str(cmd.Path)
 	first := true

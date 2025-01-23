@@ -31,7 +31,7 @@ func NewLockedMap[T any](identifier string) LockedMap[T] {
 	}
 }
 
-func (m LockedMap[T]) Update(key string, value T) error {
+func (m LockedMap[T]) Update(key string, value T) {
 	log.Info().
 		Str("event", "write-"+m.identifier).
 		Str("key", key).
@@ -42,8 +42,6 @@ func (m LockedMap[T]) Update(key string, value T) error {
 	defer m.mutex.Unlock()
 
 	m.data[key] = value
-
-	return nil
 }
 
 func (m LockedMap[T]) Get(key string) (T, error) {

@@ -7,7 +7,7 @@ import (
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
-	"os"
+	"github.com/rs/zerolog/log"
 )
 
 type DeployBoot struct {
@@ -68,7 +68,7 @@ func (step DeployTest) Run(ctx context.Context, mctx *common.MorphContext, allHo
 }
 
 func deploy(ctx context.Context, mctx *common.MorphContext, cache_ *cache.LockedMap[string], host nix.Host, deployAction string) error {
-	fmt.Fprintf(os.Stderr, "Executing %s on %s", deployAction, host.Name)
+	log.Info().Msg(fmt.Sprintf("Executing %s on %s", deployAction, host.Name))
 
 	closure, err := cache_.Get("closure:" + host.Name)
 	if err != nil {

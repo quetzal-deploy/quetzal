@@ -8,6 +8,7 @@ import (
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/ssh"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"sort"
@@ -17,7 +18,9 @@ import (
 )
 
 const (
+	Waiting   string = "waiting"
 	Scheduled string = "scheduled"
+	Blocked   string = "blocked"
 	Running   string = "running"
 	Done      string = "done"
 )
@@ -32,6 +35,8 @@ type MegaContext struct { // FIXME: Lol get rid of this
 	Cache        *cache.LockedMap[string]
 	StepsDone    *cache.LockedMap[string]
 	Steps        *cache.LockedMap[Step]
+	UIActive     bool
+	UI           *tea.Program
 	//State tilføj steps and bla bla, stat
 }
 
@@ -48,6 +53,13 @@ func (mega *MegaContext) UpdateStepStatus(stepId string, status string) {
 		Msg("step update")
 
 	mega.StepsDone.Update(stepId, status)
+
+	if mega.UIActive {
+		mega.UI.Send(common.StepUpdateEvent{
+			StepId: stepId,
+			State:  status,
+		})
+	}
 }
 
 func StepMonitor(stepsDb *cache.LockedMap[Step], m *cache.LockedMap[string]) {
@@ -158,12 +170,14 @@ func waitForDependencies(megaContext MegaContext, id string, hint string, depend
 		dependenciesStillWaiting = append(dependenciesStillWaiting, dependency)
 	}
 
-	fmt.Printf("%s: depends on %d steps: %v\n", id, len(dependencies), dependencies)
+	log.Info().Msg(fmt.Sprintf("%s: depends on %d steps: %v\n", id, len(dependencies), dependencies))
 
 	for {
 		if len(dependenciesStillWaiting) == 0 {
 			break
 		}
+
+		megaContext.UpdateStepStatus(id, Blocked)
 
 		zLogWaitingDependencies := zerolog.Arr()
 
