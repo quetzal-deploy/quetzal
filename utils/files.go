@@ -1,12 +1,10 @@
 package utils
 
 import (
-	"errors"
-	"fmt"
-	"os"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
 func GetAbsPathRelativeTo(path string, reference string) string {
@@ -18,16 +16,18 @@ func GetAbsPathRelativeTo(path string, reference string) string {
 }
 
 func ValidateEnvironment(dependencies ...string) {
-	missingDepencies := make([]string, 0)
+	missingDependencies := zerolog.Arr()
+	hasMissingDependencies := false
 	for _, dependency := range dependencies {
 		_, err := exec.LookPath(dependency)
 		if err != nil {
-			missingDepencies = append(missingDepencies, dependency)
+			hasMissingDependencies = true
+			missingDependencies.Str(dependency)
 		}
 	}
 
-	if len(missingDepencies) > 0 {
-		fmt.Fprint(os.Stderr, errors.New("Missing dependencies: '"+strings.Join(missingDepencies, ", ")+"' on $PATH"))
+	if hasMissingDependencies {
+		log.Fatal().Array("dependencies", missingDependencies).Msg("Missing dependencies")
 		Exit(1)
 	}
 }
