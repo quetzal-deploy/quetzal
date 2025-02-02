@@ -31,7 +31,7 @@ func NewLockedMap[T any](identifier string) LockedMap[T] {
 	}
 }
 
-func (m LockedMap[T]) Update(key string, value T) {
+func (m *LockedMap[T]) Update(key string, value T) {
 	log.Info().
 		Str("event", "write-"+m.identifier).
 		Str("key", key).
@@ -44,7 +44,7 @@ func (m LockedMap[T]) Update(key string, value T) {
 	m.data[key] = value
 }
 
-func (m LockedMap[T]) Get(key string) (T, error) {
+func (m *LockedMap[T]) Get(key string) (T, error) {
 	// FIXME: return error on m miss
 
 	m.mutex.RLock()
@@ -58,7 +58,7 @@ func (m LockedMap[T]) Get(key string) (T, error) {
 	}
 }
 
-func (m LockedMap[T]) GetCopy() map[string]T {
+func (m *LockedMap[T]) GetCopy() map[string]T {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
