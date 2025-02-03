@@ -18,11 +18,6 @@ type LockedMap[T any] struct {
 	data       map[string]T
 }
 
-//type Cache struct {
-//	mutex sync.RWMutex
-//	data  map[string]string
-//}
-
 func NewLockedMap[T any](identifier string) LockedMap[T] {
 	return LockedMap[T]{
 		identifier: identifier,
@@ -45,8 +40,6 @@ func (m *LockedMap[T]) Update(key string, value T) {
 }
 
 func (m *LockedMap[T]) Get(key string) (T, error) {
-	// FIXME: return error on m miss
-
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
