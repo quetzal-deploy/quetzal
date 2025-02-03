@@ -26,12 +26,40 @@ func NewLockedMap[T any](identifier string) LockedMap[T] {
 	}
 }
 
+func (m *LockedMap[T]) GetOrSet(key string, value T) T {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if data, ok := m.data[key]; ok {
+		log.Info().
+			Str("event", "store-get-or-set").
+			Str("store", m.identifier).
+			Str("key", key).
+			Any("value", value).
+			Msg(fmt.Sprintf("get-or-set on '%s': key '%s' exists", m.identifier, key))
+
+		return data
+	} else {
+		log.Info().
+			Str("event", "store-get-or-set").
+			Str("store", m.identifier).
+			Str("key", key).
+			Any("value", value).
+			Msg(fmt.Sprintf("get-or-set on '%s': key '%s' missing -> '%s' = '%v'", m.identifier, key, key, value))
+
+		m.data[key] = value
+
+		return value
+	}
+}
+
 func (m *LockedMap[T]) Update(key string, value T) {
 	log.Info().
-		Str("event", "write-"+m.identifier).
+		Str("event", "store-write").
+		Str("store", m.identifier).
 		Str("key", key).
 		Any("value", value).
-		Msg("write to " + m.identifier)
+		Msg(fmt.Sprintf("write on '%s': '%s' = '%v'", m.identifier, key, value))
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
