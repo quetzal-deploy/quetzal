@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/DBCDK/morph/logging"
 	"io"
 	"os"
 	"os/exec"
@@ -198,8 +199,7 @@ func (sshCtx *SSHContext) CmdInteractive(host Host, timeout int, parts ...string
 
 	cmd, err := sshCtx.CmdContext(ctx, host, parts...)
 	if err == nil {
-		cmd.Stdout = os.Stderr
-		cmd.Stderr = os.Stderr
+		logging.LogCmd(host.GetName(), cmd)
 		err = cmd.Run()
 	}
 
@@ -251,8 +251,8 @@ func (ctx *SSHContext) ActivateConfiguration(host Host, configuration string, ac
 			return err
 		}
 
-		cmd.Stdout = os.Stderr
-		cmd.Stderr = os.Stderr
+		logging.LogCmd(host.GetName(), cmd)
+
 		err = cmd.Run()
 		if err != nil {
 			return err
@@ -270,8 +270,8 @@ func (ctx *SSHContext) ActivateConfiguration(host Host, configuration string, ac
 		return err
 	}
 
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
+	logging.LogCmd(host.GetName(), cmd)
+
 	err = cmd.Run()
 	if err != nil {
 		return errors.New("Error while activating new configuration.")

@@ -384,8 +384,8 @@ func (ctx *NixContext) EvalHosts(deploymentPath string, attr string) (string, er
 		}
 	})
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	logging.LogCmd("localhost", cmd)
+
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, fmt.Sprintf("MORPH_ARGS=%s", jsonArgs))
 	err = cmd.Run()
