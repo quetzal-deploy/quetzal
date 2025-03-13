@@ -25,7 +25,7 @@ import (
 type Host struct {
 	PreDeployChecks         healthchecks.HealthChecks
 	HealthChecks            healthchecks.HealthChecks
-	Name                    string
+	Name                    string `json:"name"`
 	NixosRelease            string
 	TargetHost              string
 	TargetPort              int
@@ -35,7 +35,7 @@ type Host struct {
 	SubstituteOnDestination bool
 	NixConfig               map[string]string
 	Tags                    []string
-	Labels                  map[string]string
+	Labels                  map[string]string `json:"labels"`
 }
 
 type HostOrdering struct {
@@ -74,6 +74,7 @@ type DeploymentMetadata struct {
 	Description string
 	Ordering    HostOrdering
 	Constraints []Constraint
+	Color       string `json:"color"`
 }
 
 type Deployment struct {

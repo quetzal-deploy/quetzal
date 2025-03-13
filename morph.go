@@ -53,6 +53,8 @@ var (
 	nixBuildArg         []string
 	nixBuildTarget      string
 	nixBuildTargetFile  string
+	daemon              = daemonCmd(app.Command("daemon", "Expose morph over HTTP"))
+	deploymentsDir      string
 	build               = buildCmd(app.Command("build", "Evaluate and build deployment configuration to the local Nix store"))
 	eval                = evalCmd(app.Command("eval", "Inspect value of an attribute without building"))
 	push                = pushCmd(app.Command("push", "Build and transfer items from the local Nix store to target machines"))
@@ -182,6 +184,14 @@ func asJsonFlag(cmd *kingpin.CmdClause) {
 func evalCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
 	deploymentArg(cmd)
 	attributeArg(cmd)
+	return cmd
+}
+
+func daemonCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
+	cmd.Arg("deployments directory", "Directory containing deployment files").
+		Required().
+		StringVar(&deploymentsDir)
+
 	return cmd
 }
 
@@ -323,6 +333,11 @@ func main() {
 
 	clause := kingpin.MustParse(app.Parse(os.Args[1:]))
 
+	if daemon.FullCommand() == clause {
+		// force JSON-output (and thus no UI)
+		*jsonOutput = true
+	}
+
 	eventManager := events.NewManager()
 
 	// Don't actually run the UI unless activated
@@ -384,6 +399,11 @@ func main() {
 	}
 
 	switch clause {
+
+	case daemon.FullCommand():
+		events.ServeHttp(mctx, 8123, eventManager, deploymentsDir)
+		return
+
 	case _planRun.FullCommand():
 		// FIXME: embed plan instead of file path
 		log.Info().

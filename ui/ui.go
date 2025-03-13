@@ -406,7 +406,7 @@ func renderStepsInState(m model, state string) string {
 	return render
 }
 
-func DoTea(eventChan chan events.Event) *tea.Program {
+func DoTea(eventChan chan events.EventWithId) *tea.Program {
 	p := tea.NewProgram(
 		model{
 			viewportContent: "",
@@ -424,7 +424,7 @@ func DoTea(eventChan chan events.Event) *tea.Program {
 	go func() {
 		for {
 			event := <-eventChan
-			p.Send(event)
+			p.Send(event.Event) // ignore the ID
 		}
 	}()
 

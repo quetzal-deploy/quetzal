@@ -135,6 +135,7 @@ rec {
           description = network.description or "";
           ordering = network.ordering or { };
           constraints = network.constraints or [ ];
+          color = network.color or "grey";
         };
       };
 
