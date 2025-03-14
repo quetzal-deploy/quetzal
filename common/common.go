@@ -7,31 +7,50 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type MorphContext struct {
-	SSHContext *ssh.SSHContext
-	NixContext *nix.NixContext
+type MorphOptions struct {
+	Version   string
+	AssetRoot string
 
-	// Globals we need to get rid off
-	AssetRoot           string
+	DryRun          *bool
+	JsonOut         *bool
+	ConstraintsFlag *[]string
+	KeepGCRoot      *bool
+	AllowBuildShell *bool
+	PlanOnly        *bool
+	DotFile         *string
+
+	AsJson              bool
+	AskForSudoPasswd    bool
 	AttrKey             string
 	Deployment          string
-	DeploySwitchAction  string
+	DeploymentsDir      string
 	DeployReboot        bool
+	DeploySwitchAction  string
 	DeployUploadSecrets bool
-	DryRun              bool
 	ExecuteCommand      []string
+	HostsMap            map[string]nix.Host
 	NixBuildArg         []string
 	NixBuildTarget      string
 	NixBuildTargetFile  string
 	OrderingTags        string
+	PassCmd             string
+	PlanAction          string
+	PlanFile            string
 	SelectEvery         int
 	SelectGlob          string
 	SelectLimit         int
 	SelectSkip          int
 	SelectTags          string
+	ShowTrace           bool
 	SkipHealthChecks    bool
 	SkipPreDeployChecks bool
 	Timeout             int
+}
+
+type MorphContext struct {
+	Config     *MorphOptions
+	SSHContext *ssh.SSHContext
+	NixContext *nix.NixContext
 }
 
 func HandleError(err error) {

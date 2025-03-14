@@ -26,7 +26,7 @@ func execHealthCheck(mctx common.MorphContext, hosts []nix.Host) error {
 			fmt.Fprintf(os.Stderr, "Healthchecks are disabled for build-only host: %s\n", host.Name)
 			continue
 		}
-		err = healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Timeout)
+		err = healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
 	}
 
 	if err != nil {
@@ -49,8 +49,8 @@ func execUploadSecrets(mctx *common.MorphContext, hosts []nix.Host, phase *strin
 			return err
 		}
 
-		if !mctx.SkipHealthChecks {
-			err = healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Timeout)
+		if !mctx.Config.SkipHealthChecks {
+			err = healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not uploading to additional hosts, since a host health check failed.")
@@ -75,7 +75,7 @@ func execListSecrets(hosts []nix.Host) {
 }
 
 func execListSecretsAsJson(mctx *common.MorphContext, hosts []nix.Host) error {
-	deploymentDir, err := filepath.Abs(filepath.Dir(mctx.Deployment))
+	deploymentDir, err := filepath.Abs(filepath.Dir(mctx.Config.Deployment))
 	if err != nil {
 		return err
 	}
@@ -120,26 +120,26 @@ func GetHosts(mctx *common.MorphContext, deploymentPath string) (deploymentMetad
 		return deploymentMetadata, hosts, err
 	}
 
-	matchingHosts, err := filter.MatchHosts(deployment.Hosts, mctx.SelectGlob)
+	matchingHosts, err := filter.MatchHosts(deployment.Hosts, mctx.Config.SelectGlob)
 	if err != nil {
 		return deploymentMetadata, hosts, err
 	}
 
 	var selectedTags []string
-	if mctx.SelectTags != "" {
-		selectedTags = strings.Split(mctx.SelectTags, ",")
+	if mctx.Config.SelectTags != "" {
+		selectedTags = strings.Split(mctx.Config.SelectTags, ",")
 	}
 
 	matchingHosts2 := filter.FilterHostsTags(matchingHosts, selectedTags)
 
 	ordering := deployment.Meta.Ordering
-	if mctx.OrderingTags != "" {
-		ordering = nix.HostOrdering{Tags: strings.Split(mctx.OrderingTags, ",")}
+	if mctx.Config.OrderingTags != "" {
+		ordering = nix.HostOrdering{Tags: strings.Split(mctx.Config.OrderingTags, ",")}
 	}
 
 	sortedHosts := filter.SortHosts(matchingHosts2, ordering)
 
-	filteredHosts := filter.FilterHosts(sortedHosts, mctx.SelectSkip, mctx.SelectEvery, mctx.SelectLimit)
+	filteredHosts := filter.FilterHosts(sortedHosts, mctx.Config.SelectSkip, mctx.Config.SelectEvery, mctx.Config.SelectLimit)
 
 	zLogHostsDict := zerolog.Dict()
 	for _, host := range filteredHosts {
@@ -171,21 +171,21 @@ func buildHosts(mctx *common.MorphContext, hosts []nix.Host) (resultPath string,
 		return
 	}
 
-	deploymentPath, err := filepath.Abs(mctx.Deployment)
+	deploymentPath, err := filepath.Abs(mctx.Config.Deployment)
 	if err != nil {
 		return
 	}
 
 	nixBuildTargets := ""
-	if mctx.NixBuildTargetFile != "" {
-		if path, err := filepath.Abs(mctx.NixBuildTargetFile); err == nil {
+	if mctx.Config.NixBuildTargetFile != "" {
+		if path, err := filepath.Abs(mctx.Config.NixBuildTargetFile); err == nil {
 			nixBuildTargets = fmt.Sprintf("import \"%s\"", path)
 		}
-	} else if mctx.NixBuildTarget != "" {
-		nixBuildTargets = fmt.Sprintf("{ \"out\" = %s; }", mctx.NixBuildTarget)
+	} else if mctx.Config.NixBuildTarget != "" {
+		nixBuildTargets = fmt.Sprintf("{ \"out\" = %s; }", mctx.Config.NixBuildTarget)
 	}
 
-	resultPath, err = mctx.NixContext.BuildMachines(deploymentPath, hosts, mctx.NixBuildArg, nixBuildTargets)
+	resultPath, err = mctx.NixContext.BuildMachines(deploymentPath, hosts, mctx.Config.NixBuildArg, nixBuildTargets)
 
 	if err != nil {
 		return
@@ -222,7 +222,7 @@ func pushPaths(sshContext *ssh.SSHContext, filteredHosts []nix.Host, resultPath 
 func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *string) error {
 	// upload secrets
 	// relative paths are resolved relative to the deployment file (!)
-	deploymentDir := filepath.Dir(mctx.Deployment)
+	deploymentDir := filepath.Dir(mctx.Config.Deployment)
 	for _, host := range filteredHosts {
 		fmt.Fprintf(os.Stderr, "Uploading secrets to %s (%s):\n", host.Name, host.TargetHost)
 		postUploadActions := make(map[string][]string, 0)
@@ -260,7 +260,7 @@ func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *s
 		for _, action := range postUploadActions {
 			fmt.Fprintf(os.Stderr, "\t- executing post-upload command: "+strings.Join(action, " ")+"\n")
 			// Errors from secret actions will be printed on screen, but we won't stop the flow if they fail
-			mctx.SSHContext.CmdInteractive(&host, mctx.Timeout, action...)
+			mctx.SSHContext.CmdInteractive(&host, mctx.Config.Timeout, action...)
 		}
 	}
 
@@ -268,7 +268,7 @@ func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *s
 }
 
 func activateConfiguration(mctx *common.MorphContext, filteredHosts []nix.Host, resultPath string) error {
-	fmt.Fprintln(os.Stderr, "Executing '"+mctx.DeploySwitchAction+"' on matched hosts:")
+	fmt.Fprintln(os.Stderr, "Executing '"+mctx.Config.DeploySwitchAction+"' on matched hosts:")
 	fmt.Fprintln(os.Stderr)
 	for _, host := range filteredHosts {
 
@@ -279,7 +279,7 @@ func activateConfiguration(mctx *common.MorphContext, filteredHosts []nix.Host, 
 			return err
 		}
 
-		err = mctx.SSHContext.ActivateConfiguration(&host, configuration, mctx.DeploySwitchAction)
+		err = mctx.SSHContext.ActivateConfiguration(&host, configuration, mctx.Config.DeploySwitchAction)
 		if err != nil {
 			return err
 		}
@@ -297,7 +297,7 @@ func execExecute(mctx *common.MorphContext, hosts []nix.Host) error {
 			continue
 		}
 		fmt.Fprintln(os.Stderr, "** "+host.Name)
-		mctx.SSHContext.CmdInteractive(&host, mctx.Timeout, mctx.ExecuteCommand...)
+		mctx.SSHContext.CmdInteractive(&host, mctx.Config.Timeout, mctx.Config.ExecuteCommand...)
 		fmt.Fprintln(os.Stderr)
 	}
 
@@ -313,13 +313,13 @@ func ExecBuild(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 }
 
 func ExecEval(mctx *common.MorphContext) (string, error) {
-	deploymentFile, err := os.Open(mctx.Deployment)
+	deploymentFile, err := os.Open(mctx.Config.Deployment)
 	deploymentPath, err := filepath.Abs(deploymentFile.Name())
 	if err != nil {
 		return "", err
 	}
 
-	path, err := mctx.NixContext.EvalHosts(deploymentPath, mctx.AttrKey)
+	path, err := mctx.NixContext.EvalHosts(deploymentPath, mctx.Config.AttrKey)
 
 	return path, err
 }
@@ -339,8 +339,8 @@ func execDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 	doUploadSecrets := false
 	doActivate := false
 
-	if !mctx.DryRun {
-		switch mctx.DeploySwitchAction {
+	if !*mctx.Config.DryRun {
+		switch mctx.Config.DeploySwitchAction {
 		case "dry-activate":
 			doPush = true
 			doActivate = true
@@ -350,7 +350,7 @@ func execDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 			fallthrough
 		case "boot":
 			doPush = true
-			doUploadSecrets = mctx.DeployUploadSecrets
+			doUploadSecrets = mctx.Config.DeployUploadSecrets
 			doActivate = true
 		}
 	}
@@ -388,8 +388,8 @@ func execDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 			fmt.Fprintln(os.Stderr)
 		}
 
-		if !mctx.SkipPreDeployChecks {
-			err := healthchecks.PerformPreDeployChecks(mctx.SSHContext, &host, mctx.Timeout)
+		if !mctx.Config.SkipPreDeployChecks {
+			err := healthchecks.PerformPreDeployChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host pre-deploy check failed.")
@@ -404,7 +404,7 @@ func execDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 			}
 		}
 
-		if mctx.DeployReboot {
+		if mctx.Config.DeployReboot {
 			err = host.Reboot(mctx.SSHContext)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Reboot failed")
@@ -422,8 +422,8 @@ func execDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 			fmt.Fprintln(os.Stderr)
 		}
 
-		if !mctx.SkipHealthChecks {
-			err := healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Timeout)
+		if !mctx.Config.SkipHealthChecks {
+			err := healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host health check failed.")

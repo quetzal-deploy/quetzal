@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/DBCDK/kingpin"
+	"github.com/DBCDK/morph/cliparser"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/cruft"
 	"github.com/DBCDK/morph/events"
@@ -31,272 +32,6 @@ import (
 // These are set at build time via -ldflags magic
 var version string
 var assetRoot string
-
-var switchActions = []string{"dry-activate", "test", "switch", "boot"}
-var planActions = []string{"run", "resume"}
-
-var (
-	app                 = kingpin.New("morph", "NixOS host manager").Version(version)
-	dryRun              = app.Flag("dry-run", "Don't do anything, just eval and print changes").Default("False").Bool()
-	jsonOutput          = app.Flag("i-know-kung-fu", "Output as JSON").Default("False").Bool()
-	selectGlob          string
-	selectTags          string
-	selectEvery         int
-	selectSkip          int
-	selectLimit         int
-	orderingTags        string
-	constraintsFlag     = app.Flag("constraint", "Add constraints to manipulate order of execution").Default("").Strings()
-	deployment          string
-	timeout             int
-	askForSudoPasswd    bool
-	passCmd             string
-	nixBuildArg         []string
-	nixBuildTarget      string
-	nixBuildTargetFile  string
-	daemon              = daemonCmd(app.Command("daemon", "Expose morph over HTTP"))
-	deploymentsDir      string
-	build               = buildCmd(app.Command("build", "Evaluate and build deployment configuration to the local Nix store"))
-	eval                = evalCmd(app.Command("eval", "Inspect value of an attribute without building"))
-	push                = pushCmd(app.Command("push", "Build and transfer items from the local Nix store to target machines"))
-	deploy              = deployCmd(app.Command("deploy", "Build, push and activate new configuration on machines according to switch-action"))
-	_planRoot           = app.Command("plan", "Create, run and resume plans")
-	_planRun            = runPlanCmd(_planRoot.Command("run", "Run an existing plan"))
-	_planResume         = resumePlanCmd(_planRoot.Command("resume", "Resume an existing plan"))
-	planAction          string
-	planFile            string
-	deploySwitchAction  string
-	deployUploadSecrets bool
-	deployReboot        bool
-	skipHealthChecks    bool
-	skipPreDeployChecks bool
-	showTrace           bool
-	healthCheck         = healthCheckCmd(app.Command("check-health", "Run health checks"))
-	uploadSecrets       = uploadSecretsCmd(app.Command("upload-secrets", "Upload secrets"))
-	listSecrets         = listSecretsCmd(app.Command("list-secrets", "List secrets"))
-	asJson              bool
-	attrkey             string
-	execute             = executeCmd(app.Command("exec", "Execute arbitrary commands on machines"))
-	executeCommand      []string
-	keepGCRoot          = app.Flag("keep-result", "Keep latest build in .gcroots to prevent it from being garbage collected").Default("False").Bool()
-	allowBuildShell     = app.Flag("allow-build-shell", "Allow using `network.buildShell` to build in a nix-shell which can execute arbitrary commands on the local system").Default("False").Bool()
-	planOnly            = app.Flag("plan-only", "Print the execution plan and exit").Default("False").Bool()
-	hostsMap            = make(map[string]nix.Host)
-	dotFile             = app.Flag("dot-file", "file to write plan to as a Graphviz dot-file").String()
-)
-
-func deploymentArg(cmd *kingpin.CmdClause) {
-	cmd.Arg("deployment", "File containing the nix deployment expression").
-		HintFiles("nix").
-		Required().
-		ExistingFileVar(&deployment)
-}
-
-func attributeArg(cmd *kingpin.CmdClause) {
-	cmd.Arg("attribute", "Name of attribute to inspect").
-		Required().
-		StringVar(&attrkey)
-}
-
-func timeoutFlag(cmd *kingpin.CmdClause) {
-	cmd.Flag("timeout", "Seconds to wait for commands/healthchecks on a host to complete").
-		Default("0").
-		IntVar(&timeout)
-}
-
-func askForSudoPasswdFlag(cmd *kingpin.CmdClause) {
-	cmd.
-		Flag("passwd", "Whether to ask interactively for remote sudo password when needed").
-		Default("False").
-		BoolVar(&askForSudoPasswd)
-}
-
-func getSudoPasswdCommand(cmd *kingpin.CmdClause) {
-	cmd.
-		Flag("passcmd", "Specify command to run for sudo password").
-		Default("").
-		StringVar(&passCmd)
-}
-
-func selectorFlags(cmd *kingpin.CmdClause) {
-	cmd.Flag("on", "Glob for selecting servers in the deployment").
-		Default("*").
-		StringVar(&selectGlob)
-	cmd.Flag("tagged", "Select hosts with these tags").
-		Default("").
-		StringVar(&selectTags)
-	cmd.Flag("every", "Select every n hosts").
-		Default("1").
-		IntVar(&selectEvery)
-	cmd.Flag("skip", "Skip first n hosts").
-		Default("0").
-		IntVar(&selectSkip)
-	cmd.Flag("limit", "Select at most n hosts").
-		IntVar(&selectLimit)
-	cmd.Flag("order-by-tags", "Order hosts by tags (comma separated list)").
-		Default("").
-		StringVar(&orderingTags)
-}
-
-func nixBuildArgFlag(cmd *kingpin.CmdClause) {
-	cmd.Flag("build-arg", "Extra argument to pass on to nix-build command. **DEPRECATED**").
-		StringsVar(&nixBuildArg)
-}
-
-func nixBuildTargetFlag(cmd *kingpin.CmdClause) {
-	cmd.Flag("target", "A Nix lambda defining the build target to use instead of the default").
-		StringVar(&nixBuildTarget)
-}
-
-func nixBuildTargetFileFlag(cmd *kingpin.CmdClause) {
-	cmd.Flag("target-file", "File containing a Nix attribute set, defining build targets to use instead of the default").
-		HintFiles("nix").
-		ExistingFileVar(&nixBuildTargetFile)
-}
-
-func skipHealthChecksFlag(cmd *kingpin.CmdClause) {
-	cmd.
-		Flag("skip-health-checks", "Whether to skip all health checks").
-		Default("False").
-		BoolVar(&skipHealthChecks)
-}
-
-func skipPreDeployChecksFlag(cmd *kingpin.CmdClause) {
-	cmd.
-		Flag("skip-pre-deploy-checks", "Whether to skip all pre-deploy checks").
-		Default("False").
-		BoolVar(&skipPreDeployChecks)
-}
-
-func showTraceFlag(cmd *kingpin.CmdClause) {
-	cmd.
-		Flag("show-trace", "Whether to pass --show-trace to all nix commands").
-		Default("False").
-		BoolVar(&showTrace)
-}
-
-func asJsonFlag(cmd *kingpin.CmdClause) {
-	cmd.
-		Flag("json", "Whether to format the output as JSON instead of plaintext").
-		Default("False").
-		BoolVar(&asJson)
-}
-
-func evalCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	deploymentArg(cmd)
-	attributeArg(cmd)
-	return cmd
-}
-
-func daemonCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	cmd.Arg("deployments directory", "Directory containing deployment files").
-		Required().
-		StringVar(&deploymentsDir)
-
-	return cmd
-}
-
-func buildCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	selectorFlags(cmd)
-	showTraceFlag(cmd)
-	nixBuildArgFlag(cmd)
-	nixBuildTargetFlag(cmd)
-	nixBuildTargetFileFlag(cmd)
-	deploymentArg(cmd)
-	return cmd
-}
-
-func pushCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	selectorFlags(cmd)
-	showTraceFlag(cmd)
-	deploymentArg(cmd)
-	return cmd
-}
-
-func executeCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	selectorFlags(cmd)
-	showTraceFlag(cmd)
-	askForSudoPasswdFlag(cmd)
-	getSudoPasswdCommand(cmd)
-	timeoutFlag(cmd)
-	deploymentArg(cmd)
-	cmd.
-		Arg("command", "Command to execute").
-		Required().
-		StringsVar(&executeCommand)
-	cmd.NoInterspersed = true
-	return cmd
-}
-
-func deployCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	selectorFlags(cmd)
-	showTraceFlag(cmd)
-	nixBuildArgFlag(cmd)
-	deploymentArg(cmd)
-	timeoutFlag(cmd)
-	askForSudoPasswdFlag(cmd)
-	getSudoPasswdCommand(cmd)
-	skipHealthChecksFlag(cmd)
-	skipPreDeployChecksFlag(cmd)
-	cmd.
-		Flag("upload-secrets", "Upload secrets as part of the host deployment").
-		Default("False").
-		BoolVar(&deployUploadSecrets)
-	cmd.
-		Flag("reboot", "Reboots the host after system activation, but before healthchecks has executed.").
-		Default("False").
-		BoolVar(&deployReboot)
-	cmd.
-		Arg("switch-action", "Either of "+strings.Join(switchActions, "|")).
-		Required().
-		HintOptions(switchActions...).
-		EnumVar(&deploySwitchAction, switchActions...)
-	return cmd
-}
-
-func planFileArg(cmd *kingpin.CmdClause) {
-	cmd.Arg("plan", "File containing the deployment plan").
-		HintFiles("json").
-		Required().
-		ExistingFileVar(&planFile)
-}
-
-func runPlanCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	planFileArg(cmd)
-
-	return cmd
-}
-
-func resumePlanCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	planFileArg(cmd)
-
-	return cmd
-}
-
-func healthCheckCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	selectorFlags(cmd)
-	showTraceFlag(cmd)
-	deploymentArg(cmd)
-	timeoutFlag(cmd)
-	return cmd
-}
-
-func uploadSecretsCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	selectorFlags(cmd)
-	showTraceFlag(cmd)
-	askForSudoPasswdFlag(cmd)
-	getSudoPasswdCommand(cmd)
-	skipHealthChecksFlag(cmd)
-	deploymentArg(cmd)
-	return cmd
-}
-
-func listSecretsCmd(cmd *kingpin.CmdClause) *kingpin.CmdClause {
-	selectorFlags(cmd)
-	showTraceFlag(cmd)
-	deploymentArg(cmd)
-	asJsonFlag(cmd)
-	return cmd
-}
 
 func setup() {
 	utils.ValidateEnvironment("nix")
@@ -331,11 +66,13 @@ func main() {
 
 	// Metrics that can be reacted on
 
-	clause := kingpin.MustParse(app.Parse(os.Args[1:]))
+	cli, cmdClauses, opts := cliparser.New(version, assetRoot)
 
-	if daemon.FullCommand() == clause {
+	clause := kingpin.MustParse(cli.Parse(os.Args[1:]))
+
+	if cmdClauses.Daemon.FullCommand() == clause {
 		// force JSON-output (and thus no UI)
-		*jsonOutput = true
+		*opts.JsonOut = true
 	}
 
 	eventManager := events.NewManager()
@@ -343,7 +80,7 @@ func main() {
 	// Don't actually run the UI unless activated
 	tui := ui.DoTea(eventManager.Subscribe())
 
-	if !*jsonOutput {
+	if !*opts.JsonOut {
 		go func() {
 			if _, err := tui.Run(); err != nil {
 				fmt.Printf("morph failed: %v", err)
@@ -366,33 +103,14 @@ func main() {
 	setup()
 
 	mctx := &common.MorphContext{
-		SSHContext:          ssh.CreateSSHContext(askForSudoPasswd, passCmd),
-		NixContext:          nix.GetNixContext(assetRoot, showTrace, *keepGCRoot, *allowBuildShell),
-		AssetRoot:           assetRoot,
-		AttrKey:             attrkey,
-		Deployment:          deployment,
-		DeploySwitchAction:  deploySwitchAction,
-		DeployReboot:        deployReboot,
-		DeployUploadSecrets: deployUploadSecrets,
-		DryRun:              *dryRun,
-		ExecuteCommand:      executeCommand,
-		NixBuildArg:         nixBuildArg,
-		NixBuildTarget:      nixBuildTarget,
-		NixBuildTargetFile:  nixBuildTargetFile,
-		OrderingTags:        orderingTags, // FIXME: should these be split already here?
-		SelectEvery:         selectEvery,
-		SelectGlob:          selectGlob,
-		SelectLimit:         selectLimit,
-		SelectSkip:          selectSkip,
-		SelectTags:          selectTags, // FIXME: should these be split already here?
-		SkipHealthChecks:    skipHealthChecks,
-		SkipPreDeployChecks: skipPreDeployChecks,
-		Timeout:             timeout,
+		Config:     opts,
+		SSHContext: ssh.CreateSSHContext(opts.AskForSudoPasswd, opts.PassCmd),
+		NixContext: nix.GetNixContext(assetRoot, opts.ShowTrace, *opts.KeepGCRoot, *opts.AllowBuildShell),
 	}
 
 	// evaluate without building hosts
 	switch clause {
-	case eval.FullCommand():
+	case cmdClauses.Eval.FullCommand():
 		_, err := cruft.ExecEval(mctx)
 		common.HandleError(err)
 		return
@@ -400,35 +118,35 @@ func main() {
 
 	switch clause {
 
-	case daemon.FullCommand():
-		events.ServeHttp(mctx, 8123, eventManager, deploymentsDir)
+	case cmdClauses.Daemon.FullCommand():
+		events.ServeHttp(mctx, 8123, eventManager, opts.DeploymentsDir)
 		return
 
-	case _planRun.FullCommand():
+	case cmdClauses.PlanRun.FullCommand():
 		// FIXME: embed plan instead of file path
 		log.Info().
-			Str("plan", planFile).
+			Str("plan", opts.PlanFile).
 			Msg("running plan")
 
-	case _planResume.FullCommand():
+	case cmdClauses.PlanResume.FullCommand():
 		// FIXME: embed plan instead of file path
 		log.Info().
-			Str("plan", planFile).
+			Str("plan", opts.PlanFile).
 			Msg("resuming plan")
 
 	default:
 		// setup hosts
 		// FIXME: Should this be its own step instead?
 		// But then what about the generated plan? It can no longer contain the lists of hosts, but only the deployment and filters users, which will make resume difficult..
-		deploymentMetadata, hosts, err := cruft.GetHosts(mctx, deployment)
+		deploymentMetadata, hosts, err := cruft.GetHosts(mctx, opts.Deployment)
 		common.HandleError(err)
 
 		for _, host := range hosts {
-			hostsMap[host.Name] = host
+			opts.HostsMap[host.Name] = host
 		}
 
-		plan := createPlan(hosts, clause)
-		if !*jsonOutput {
+		plan := createPlan(cmdClauses, opts, hosts, clause)
+		if !*opts.JsonOut {
 			eventManager.SendEvent(plan)
 		}
 
@@ -443,8 +161,8 @@ func main() {
 			RawJSON("plan", planJson).
 			Msg("Generated plan")
 
-		if dotFile != nil && *dotFile != "" {
-			f, err := os.Create(*dotFile)
+		if opts.DotFile != nil && *opts.DotFile != "" {
+			f, err := os.Create(*opts.DotFile)
 			if err != nil {
 				panic(err)
 			}
@@ -455,7 +173,7 @@ func main() {
 			writer.Flush()
 		}
 
-		if *planOnly { // FIXME: Is this really *dryRun instead? Not sure
+		if *opts.PlanOnly { // FIXME: Is this really *dryRun instead? Not sure
 			// Don't execute the plan
 			return
 		}
@@ -465,7 +183,7 @@ func main() {
 		constraintsArgs := make([]nix.Constraint, 0)
 		constraintsDefaults := make([]nix.Constraint, 0)
 
-		for _, c := range *constraintsFlag {
+		for _, c := range *opts.ConstraintsFlag {
 			if len(c) == 0 {
 				continue
 			}
@@ -513,7 +231,7 @@ func main() {
 			os.Exit(17)
 		}
 
-		megaContext := planner.NewMegaContext(eventManager, hostsMap, mctx, constraints)
+		megaContext := planner.NewMegaContext(eventManager, opts.HostsMap, mctx, constraints)
 
 		go planner.StepMonitor(megaContext.Steps, megaContext.StepStatus)
 
@@ -523,13 +241,13 @@ func main() {
 		if err != nil {
 			log.Error().Err(err).Msg("Error while running step") // FIXME: Log the offending step/action somehow
 			// FIXME: Dump the plan with status on what was done, and what wasn't, so it can be resumed
-			if *jsonOutput {
+			if *opts.JsonOut {
 				// don't os.Exit if running with UI
 				os.Exit(1)
 			}
 		}
 
-		if !*jsonOutput {
+		if !*opts.JsonOut {
 			// Let the user terminate morph from the UI
 			tui.Wait()
 		}
@@ -560,7 +278,8 @@ func main() {
 }
 
 // TODO: Different planners should have default constraints exposed, to be displayed in the UI for suggestions to override
-func createPlan(hosts []nix.Host, clause string) steps.Step {
+// FIXME: Refactor to not need cmdClauses and opts
+func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptions, hosts []nix.Host, clause string) steps.Step {
 	plan := planner.EmptyStep()
 	plan.Id = "root"
 	plan.Description = "Root of execution plan"
@@ -588,16 +307,16 @@ func createPlan(hosts []nix.Host, clause string) steps.Step {
 
 	stepGetSudoPasswd := planner.CreateStepGetSudoPasswd()
 
-	if askForSudoPasswd {
+	if opts.AskForSudoPasswd {
 		plan = planner.AddSteps(plan, stepGetSudoPasswd)
 	}
 
 	switch clause {
-	case build.FullCommand():
+	case cmdClauses.Build.FullCommand():
 
 		plan = planner.AddSteps(plan, buildPlan)
 
-	case push.FullCommand():
+	case cmdClauses.Push.FullCommand():
 
 		plan = planner.AddSteps(plan, buildPlan)
 
@@ -610,7 +329,7 @@ func createPlan(hosts []nix.Host, clause string) steps.Step {
 			)
 		}
 
-	case deploy.FullCommand():
+	case cmdClauses.Deploy.FullCommand():
 		plan = planner.AddSteps(plan, buildPlan)
 
 		for _, host := range hosts {
@@ -643,15 +362,15 @@ func createPlan(hosts []nix.Host, clause string) steps.Step {
 				planner.HealthChecksToRequests(host.HealthChecks.Http),
 			)
 
-			if skipPreDeployChecks {
+			if opts.SkipPreDeployChecks {
 				preDeployChecks = planner.CreateStepSkip(preDeployChecks)
 			}
 
-			if skipHealthChecks {
+			if opts.SkipHealthChecks {
 				healthChecks = planner.CreateStepSkip(healthChecks)
 			}
 
-			if askForSudoPasswd {
+			if opts.AskForSudoPasswd {
 				deployDryActivate.DependsOn = append(deployDryActivate.DependsOn, stepGetSudoPasswd.Id)
 				deploySwitch.DependsOn = append(deploySwitch.DependsOn, stepGetSudoPasswd.Id)
 				deployTest.DependsOn = append(deployTest.DependsOn, stepGetSudoPasswd.Id)
@@ -659,7 +378,7 @@ func createPlan(hosts []nix.Host, clause string) steps.Step {
 				stepReboot.DependsOn = append(stepReboot.DependsOn, stepGetSudoPasswd.Id)
 			}
 
-			switch deploySwitchAction {
+			switch opts.DeploySwitchAction {
 			case "dry-activate":
 				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
 					hostSpecificPlans[host.Name],
@@ -696,7 +415,7 @@ func createPlan(hosts []nix.Host, clause string) steps.Step {
 			}
 
 			// reboot can be added to any action, even if weird..
-			if deployReboot {
+			if opts.DeployReboot {
 				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
 					hostSpecificPlans[host.Name],
 					stepReboot,
@@ -706,7 +425,7 @@ func createPlan(hosts []nix.Host, clause string) steps.Step {
 			}
 		}
 
-	case healthCheck.FullCommand():
+	case cmdClauses.HealthCheck.FullCommand():
 
 		plan = planner.AddSteps(plan, buildPlan)
 
@@ -729,13 +448,13 @@ func createPlan(hosts []nix.Host, clause string) steps.Step {
 			)
 		}
 
-	case uploadSecrets.FullCommand():
+	case cmdClauses.SecretsUpload.FullCommand():
 		log.Error().Msg("Execution plan: deploy: Not implemented")
 
-	case listSecrets.FullCommand():
+	case cmdClauses.SecretsList.FullCommand():
 		log.Error().Msg("Execution plan: deploy: Not implemented")
 
-	case execute.FullCommand():
+	case cmdClauses.Execute.FullCommand():
 		log.Error().Msg("Execution plan: execute: Not implemented")
 
 	}
