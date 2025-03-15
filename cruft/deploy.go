@@ -1,7 +1,6 @@
 package cruft
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
@@ -14,12 +13,148 @@ import (
 	"github.com/DBCDK/morph/filter"
 	"github.com/DBCDK/morph/healthchecks"
 	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/secrets"
 	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/utils"
 )
 
-func execHealthCheck(mctx common.MorphContext, hosts []nix.Host) error {
+func ExecBuild(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
+	resultPath, err := buildHosts(mctx, hosts)
+	if err != nil {
+		return "", err
+	}
+	return resultPath, nil
+}
+
+func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
+	doPush := false
+	doUploadSecrets := false
+	doActivate := false
+
+	if !*mctx.Config.DryRun {
+		switch mctx.Config.DeploySwitchAction {
+		case "dry-activate":
+			doPush = true
+			doActivate = true
+		case "test":
+			fallthrough
+		case "switch":
+			fallthrough
+		case "boot":
+			doPush = true
+			doUploadSecrets = mctx.Config.DeployUploadSecrets
+			doActivate = true
+		}
+	}
+
+	resultPath, err := buildHosts(mctx, hosts)
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Fprintln(os.Stderr)
+
+	for _, host := range hosts {
+		if host.BuildOnly {
+			fmt.Fprintf(os.Stderr, "Deployment steps are disabled for build-only host: %s\n", host.Name)
+			continue
+		}
+
+		singleHostInList := []nix.Host{host}
+
+		if doPush {
+			err = pushPaths(mctx.SSHContext, singleHostInList, resultPath)
+			if err != nil {
+				return "", err
+			}
+		}
+		fmt.Fprintln(os.Stderr)
+
+		if doUploadSecrets {
+			phase := "pre-activation"
+			err = ExecUploadSecrets(mctx, singleHostInList, &phase)
+			if err != nil {
+				return "", err
+			}
+
+			fmt.Fprintln(os.Stderr)
+		}
+
+		if !mctx.Config.SkipPreDeployChecks {
+			err := healthchecks.PerformPreDeployChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
+			if err != nil {
+				fmt.Fprintln(os.Stderr)
+				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host pre-deploy check failed.")
+				utils.Exit(1)
+			}
+		}
+
+		if doActivate {
+			err = activateConfiguration(mctx, singleHostInList, resultPath)
+			if err != nil {
+				return "", err
+			}
+		}
+
+		if mctx.Config.DeployReboot {
+			err = host.Reboot(mctx.SSHContext)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Reboot failed")
+				return "", err
+			}
+		}
+
+		if doUploadSecrets {
+			phase := "post-activation"
+			err = ExecUploadSecrets(mctx, singleHostInList, &phase)
+			if err != nil {
+				return "", err
+			}
+
+			fmt.Fprintln(os.Stderr)
+		}
+
+		if !mctx.Config.SkipHealthChecks {
+			err := healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
+			if err != nil {
+				fmt.Fprintln(os.Stderr)
+				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host health check failed.")
+				utils.Exit(1)
+			}
+		}
+
+		fmt.Fprintln(os.Stderr, "Done:", host.Name)
+	}
+
+	return resultPath, nil
+}
+
+func ExecEval(mctx *common.MorphContext) (string, error) {
+	deploymentFile, err := os.Open(mctx.Config.Deployment)
+	deploymentPath, err := filepath.Abs(deploymentFile.Name())
+	if err != nil {
+		return "", err
+	}
+
+	path, err := mctx.NixContext.EvalHosts(deploymentPath, mctx.Config.AttrKey)
+
+	return path, err
+}
+
+func ExecExecute(mctx *common.MorphContext, hosts []nix.Host) error {
+	for _, host := range hosts {
+		if host.BuildOnly {
+			fmt.Fprintf(os.Stderr, "Exec is disabled for build-only host: %s\n", host.Name)
+			continue
+		}
+		fmt.Fprintln(os.Stderr, "** "+host.Name)
+		mctx.SSHContext.CmdInteractive(&host, mctx.Config.Timeout, mctx.Config.ExecuteCommand...)
+		fmt.Fprintln(os.Stderr)
+	}
+
+	return nil
+}
+
+func ExecHealthCheck(mctx common.MorphContext, hosts []nix.Host) error {
 	var err error
 	for _, host := range hosts {
 		if host.BuildOnly {
@@ -36,71 +171,14 @@ func execHealthCheck(mctx common.MorphContext, hosts []nix.Host) error {
 	return err
 }
 
-func execUploadSecrets(mctx *common.MorphContext, hosts []nix.Host, phase *string) error {
-	for _, host := range hosts {
-		if host.BuildOnly {
-			fmt.Fprintf(os.Stderr, "Secret upload is disabled for build-only host: %s\n", host.Name)
-			continue
-		}
-		singleHostInList := []nix.Host{host}
-
-		err := secretsUpload(mctx, singleHostInList, phase)
-		if err != nil {
-			return err
-		}
-
-		if !mctx.Config.SkipHealthChecks {
-			err = healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
-			if err != nil {
-				fmt.Fprintln(os.Stderr)
-				fmt.Fprintln(os.Stderr, "Not uploading to additional hosts, since a host health check failed.")
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func execListSecrets(hosts []nix.Host) {
-	for _, host := range hosts {
-		singleHostInList := []nix.Host{host}
-		for _, host := range singleHostInList {
-			fmt.Fprintf(os.Stdout, "Secrets for host %s:\n", host.Name)
-			for name, secret := range host.Secrets {
-				fmt.Fprintf(os.Stdout, "%s:\n- %v\n", name, &secret)
-			}
-		}
-	}
-}
-
-func execListSecretsAsJson(mctx *common.MorphContext, hosts []nix.Host) error {
-	deploymentDir, err := filepath.Abs(filepath.Dir(mctx.Config.Deployment))
+func ExecPush(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
+	resultPath, err := ExecBuild(mctx, hosts)
 	if err != nil {
-		return err
-	}
-	secretsByHost := make(map[string](map[string]secrets.Secret))
-
-	for _, host := range hosts {
-		singleHostInList := []nix.Host{host}
-		for _, host := range singleHostInList {
-			canonicalSecrets := make(map[string]secrets.Secret)
-			for name, secret := range host.Secrets {
-				sourcePath := utils.GetAbsPathRelativeTo(secret.Source, deploymentDir)
-				secret.Source = sourcePath
-				canonicalSecrets[name] = secret
-			}
-			secretsByHost[host.Name] = canonicalSecrets
-		}
+		return "", err
 	}
 
-	jsonSecrets, err := json.MarshalIndent(secretsByHost, "", "  ")
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stdout, "%s\n", jsonSecrets)
-
-	return nil
+	fmt.Fprintln(os.Stderr)
+	return resultPath, pushPaths(mctx.SSHContext, hosts, resultPath)
 }
 
 func GetHosts(mctx *common.MorphContext, deploymentPath string) (deploymentMetadata nix.DeploymentMetadata, hosts []nix.Host, err error) {
@@ -165,6 +243,29 @@ func GetHosts(mctx *common.MorphContext, deploymentPath string) (deploymentMetad
 	return deployment.Meta, filteredHosts, nil
 }
 
+func activateConfiguration(mctx *common.MorphContext, filteredHosts []nix.Host, resultPath string) error {
+	fmt.Fprintln(os.Stderr, "Executing '"+mctx.Config.DeploySwitchAction+"' on matched hosts:")
+	fmt.Fprintln(os.Stderr)
+	for _, host := range filteredHosts {
+
+		fmt.Fprintln(os.Stderr, "** "+host.Name)
+
+		configuration, err := nix.GetNixSystemPath(host, resultPath)
+		if err != nil {
+			return err
+		}
+
+		err = mctx.SSHContext.ActivateConfiguration(&host, configuration, mctx.Config.DeploySwitchAction)
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprintln(os.Stderr)
+	}
+
+	return nil
+}
+
 func buildHosts(mctx *common.MorphContext, hosts []nix.Host) (resultPath string, err error) {
 	if len(hosts) == 0 {
 		err = errors.New("No hosts selected")
@@ -217,222 +318,4 @@ func pushPaths(sshContext *ssh.SSHContext, filteredHosts []nix.Host, resultPath 
 	}
 
 	return nil
-}
-
-func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *string) error {
-	// upload secrets
-	// relative paths are resolved relative to the deployment file (!)
-	deploymentDir := filepath.Dir(mctx.Config.Deployment)
-	for _, host := range filteredHosts {
-		fmt.Fprintf(os.Stderr, "Uploading secrets to %s (%s):\n", host.Name, host.TargetHost)
-		postUploadActions := make(map[string][]string, 0)
-		for secretName, secret := range host.Secrets {
-			// if phase is nil, upload the secrets no matter what phase it wants
-			// if phase is non-nil, upload the secrets that match the specified phase
-			if phase != nil && secret.UploadAt != *phase {
-				continue
-			}
-
-			secretSize, err := secrets.GetSecretSize(secret, deploymentDir)
-			if err != nil {
-				return err
-			}
-
-			secretErr := secrets.UploadSecret(mctx.SSHContext, &host, secret, deploymentDir)
-			fmt.Fprintf(os.Stderr, "\t* %s (%d bytes).. ", secretName, secretSize)
-			if secretErr != nil {
-				if secretErr.Fatal {
-					fmt.Fprintln(os.Stderr, "Failed")
-					return secretErr
-				} else {
-					fmt.Fprintln(os.Stderr, "Partial")
-					fmt.Fprint(os.Stderr, secretErr.Error())
-				}
-			} else {
-				fmt.Fprintln(os.Stderr, "OK")
-			}
-			if len(secret.Action) > 0 {
-				// ensure each action is only run once
-				postUploadActions[strings.Join(secret.Action, " ")] = secret.Action
-			}
-		}
-		// Execute post-upload secret actions one-by-one after all secrets have been uploaded
-		for _, action := range postUploadActions {
-			fmt.Fprintf(os.Stderr, "\t- executing post-upload command: "+strings.Join(action, " ")+"\n")
-			// Errors from secret actions will be printed on screen, but we won't stop the flow if they fail
-			mctx.SSHContext.CmdInteractive(&host, mctx.Config.Timeout, action...)
-		}
-	}
-
-	return nil
-}
-
-func activateConfiguration(mctx *common.MorphContext, filteredHosts []nix.Host, resultPath string) error {
-	fmt.Fprintln(os.Stderr, "Executing '"+mctx.Config.DeploySwitchAction+"' on matched hosts:")
-	fmt.Fprintln(os.Stderr)
-	for _, host := range filteredHosts {
-
-		fmt.Fprintln(os.Stderr, "** "+host.Name)
-
-		configuration, err := nix.GetNixSystemPath(host, resultPath)
-		if err != nil {
-			return err
-		}
-
-		err = mctx.SSHContext.ActivateConfiguration(&host, configuration, mctx.Config.DeploySwitchAction)
-		if err != nil {
-			return err
-		}
-
-		fmt.Fprintln(os.Stderr)
-	}
-
-	return nil
-}
-
-func execExecute(mctx *common.MorphContext, hosts []nix.Host) error {
-	for _, host := range hosts {
-		if host.BuildOnly {
-			fmt.Fprintf(os.Stderr, "Exec is disabled for build-only host: %s\n", host.Name)
-			continue
-		}
-		fmt.Fprintln(os.Stderr, "** "+host.Name)
-		mctx.SSHContext.CmdInteractive(&host, mctx.Config.Timeout, mctx.Config.ExecuteCommand...)
-		fmt.Fprintln(os.Stderr)
-	}
-
-	return nil
-}
-
-func ExecBuild(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
-	resultPath, err := buildHosts(mctx, hosts)
-	if err != nil {
-		return "", err
-	}
-	return resultPath, nil
-}
-
-func ExecEval(mctx *common.MorphContext) (string, error) {
-	deploymentFile, err := os.Open(mctx.Config.Deployment)
-	deploymentPath, err := filepath.Abs(deploymentFile.Name())
-	if err != nil {
-		return "", err
-	}
-
-	path, err := mctx.NixContext.EvalHosts(deploymentPath, mctx.Config.AttrKey)
-
-	return path, err
-}
-
-func execPush(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
-	resultPath, err := ExecBuild(mctx, hosts)
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Fprintln(os.Stderr)
-	return resultPath, pushPaths(mctx.SSHContext, hosts, resultPath)
-}
-
-func execDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
-	doPush := false
-	doUploadSecrets := false
-	doActivate := false
-
-	if !*mctx.Config.DryRun {
-		switch mctx.Config.DeploySwitchAction {
-		case "dry-activate":
-			doPush = true
-			doActivate = true
-		case "test":
-			fallthrough
-		case "switch":
-			fallthrough
-		case "boot":
-			doPush = true
-			doUploadSecrets = mctx.Config.DeployUploadSecrets
-			doActivate = true
-		}
-	}
-
-	resultPath, err := buildHosts(mctx, hosts)
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Fprintln(os.Stderr)
-
-	for _, host := range hosts {
-		if host.BuildOnly {
-			fmt.Fprintf(os.Stderr, "Deployment steps are disabled for build-only host: %s\n", host.Name)
-			continue
-		}
-
-		singleHostInList := []nix.Host{host}
-
-		if doPush {
-			err = pushPaths(mctx.SSHContext, singleHostInList, resultPath)
-			if err != nil {
-				return "", err
-			}
-		}
-		fmt.Fprintln(os.Stderr)
-
-		if doUploadSecrets {
-			phase := "pre-activation"
-			err = execUploadSecrets(mctx, singleHostInList, &phase)
-			if err != nil {
-				return "", err
-			}
-
-			fmt.Fprintln(os.Stderr)
-		}
-
-		if !mctx.Config.SkipPreDeployChecks {
-			err := healthchecks.PerformPreDeployChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
-			if err != nil {
-				fmt.Fprintln(os.Stderr)
-				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host pre-deploy check failed.")
-				utils.Exit(1)
-			}
-		}
-
-		if doActivate {
-			err = activateConfiguration(mctx, singleHostInList, resultPath)
-			if err != nil {
-				return "", err
-			}
-		}
-
-		if mctx.Config.DeployReboot {
-			err = host.Reboot(mctx.SSHContext)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "Reboot failed")
-				return "", err
-			}
-		}
-
-		if doUploadSecrets {
-			phase := "post-activation"
-			err = execUploadSecrets(mctx, singleHostInList, &phase)
-			if err != nil {
-				return "", err
-			}
-
-			fmt.Fprintln(os.Stderr)
-		}
-
-		if !mctx.Config.SkipHealthChecks {
-			err := healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
-			if err != nil {
-				fmt.Fprintln(os.Stderr)
-				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host health check failed.")
-				utils.Exit(1)
-			}
-		}
-
-		fmt.Fprintln(os.Stderr, "Done:", host.Name)
-	}
-
-	return resultPath, nil
 }
