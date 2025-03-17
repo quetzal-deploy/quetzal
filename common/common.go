@@ -1,10 +1,9 @@
 package common
 
 import (
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/utils"
 	"github.com/rs/zerolog/log"
+	"os"
 )
 
 type MorphOptions struct {
@@ -28,7 +27,6 @@ type MorphOptions struct {
 	DeploySwitchAction  string
 	DeployUploadSecrets bool
 	ExecuteCommand      []string
-	HostsMap            map[string]nix.Host
 	NixBuildArg         []string
 	NixBuildTarget      string
 	NixBuildTargetFile  string
@@ -47,10 +45,40 @@ type MorphOptions struct {
 	Timeout             int
 }
 
+type NixContext struct {
+	EvalCmd         string
+	BuildCmd        string
+	ShellCmd        string
+	EvalMachines    string
+	ShowTrace       bool
+	KeepGCRoot      bool
+	AllowBuildShell bool
+}
+
+type SshOptions struct {
+	SudoPassword           string
+	AskForSudoPassword     bool
+	GetSudoPasswordCommand string
+	DefaultUsername        string
+	IdentityFile           string
+	ConfigFile             string
+	SkipHostKeyCheck       bool
+}
+
+func (o *MorphOptions) SshOptions() *SshOptions {
+	return &SshOptions{
+		AskForSudoPassword:     o.AskForSudoPasswd,
+		GetSudoPasswordCommand: o.PassCmd,
+		IdentityFile:           os.Getenv("SSH_IDENTITY_FILE"),
+		DefaultUsername:        os.Getenv("SSH_USER"),
+		SkipHostKeyCheck:       os.Getenv("SSH_SKIP_HOST_KEY_CHECK") != "",
+		ConfigFile:             os.Getenv("SSH_CONFIG_FILE"),
+	}
+}
+
 type MorphContext struct {
-	Config     *MorphOptions
-	SSHContext *ssh.SSHContext
-	NixContext *nix.NixContext
+	Options    *MorphOptions
+	NixContext *NixContext
 }
 
 func HandleError(err error) {

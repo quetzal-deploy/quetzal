@@ -44,41 +44,41 @@ func GetSecretSize(secret Secret, deploymentWD string) (size int64, err error) {
 	return fStats.Size(), nil
 }
 
-func UploadSecret(ctx ssh.Context, host ssh.Host, secret Secret, deploymentWD string) *SecretError {
+func UploadSecret(sshCtx *ssh.SSHContext, host ssh.Host, secret Secret, deploymentWD string) *SecretError {
 	var partialErr *SecretError
 
-	err := ctx.WaitForMountPoints(host, secret.Destination)
+	err := sshCtx.WaitForMountPoints(host, secret.Destination)
 	if err != nil {
 		return wrap(err)
 	}
 
-	tempPath, err := ctx.MakeTempFile(host)
+	tempPath, err := sshCtx.MakeTempFile(host)
 	if err != nil {
 		return wrap(err)
 	}
 
 	if secret.MkDirs {
-		if err := ctx.MakeDirs(host, filepath.Dir(secret.Destination), true, 0755); err != nil {
+		if err := sshCtx.MakeDirs(host, filepath.Dir(secret.Destination), true, 0755); err != nil {
 			return wrap(err)
 		}
 	}
 
-	err = ctx.UploadFile(host, utils.GetAbsPathRelativeTo(secret.Source, deploymentWD), tempPath)
+	err = sshCtx.UploadFile(host, utils.GetAbsPathRelativeTo(secret.Source, deploymentWD), tempPath)
 	if err != nil {
 		return wrap(err)
 	}
 
-	err = ctx.MoveFile(host, tempPath, secret.Destination)
+	err = sshCtx.MoveFile(host, tempPath, secret.Destination)
 	if err != nil {
 		return wrap(err)
 	}
 
-	err = ctx.SetOwner(host, secret.Destination, secret.Owner.User, secret.Owner.Group)
+	err = sshCtx.SetOwner(host, secret.Destination, secret.Owner.User, secret.Owner.Group)
 	if err != nil {
 		partialErr = wrapNonFatal(err)
 	}
 
-	err = ctx.SetPermissions(host, secret.Destination, secret.Permissions)
+	err = sshCtx.SetPermissions(host, secret.Destination, secret.Permissions)
 	if err != nil {
 		partialErr = wrapNonFatal(err)
 	}

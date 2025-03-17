@@ -3,7 +3,6 @@ package cliparser
 import (
 	"github.com/DBCDK/kingpin"
 	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/nix"
 	"strings"
 )
 
@@ -31,7 +30,6 @@ func New(version string, assetRoot string) (*kingpin.Application, *KingpinCmdCla
 		Version:   version,
 		AssetRoot: assetRoot,
 
-		HostsMap:        make(map[string]nix.Host),
 		DryRun:          app.Flag("dry-run", "Don't do anything, just eval and print changes").Default("False").Bool(),
 		JsonOut:         app.Flag("i-know-kung-fu", "Output as JSON").Default("False").Bool(),
 		ConstraintsFlag: app.Flag("constraint", "Add constraints to manipulate order of execution").Default("").Strings(),

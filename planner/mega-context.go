@@ -6,7 +6,6 @@ import (
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/events"
 	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/steps"
 	"sync"
 )
@@ -16,8 +15,7 @@ import (
 type MegaContext struct {
 	Hosts        map[string]nix.Host
 	MorphContext *common.MorphContext
-	SSHContext   *ssh.SSHContext
-	NixContext   *nix.NixContext
+	NixContext   *common.NixContext
 	Cache        *cache.LockedMap[string]
 	StepStatus   *cache.LockedMap[string]
 	Steps        *cache.LockedMap[steps.Step]
@@ -35,7 +33,6 @@ func NewMegaContext(eventMgr *events.Manager, hosts map[string]nix.Host, morphCo
 	return &MegaContext{
 		Hosts:        hosts,
 		MorphContext: morphContext,
-		SSHContext:   morphContext.SSHContext,
 		NixContext:   morphContext.NixContext,
 
 		Constraints: constraints,

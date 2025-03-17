@@ -7,6 +7,7 @@ import (
 	"github.com/DBCDK/morph/healthchecks"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/secrets"
+	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/utils"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func ExecListSecrets(hosts []nix.Host) {
 }
 
 func ExecListSecretsAsJson(mctx *common.MorphContext, hosts []nix.Host) error {
-	deploymentDir, err := filepath.Abs(filepath.Dir(mctx.Config.Deployment))
+	deploymentDir, err := filepath.Abs(filepath.Dir(mctx.Options.Deployment))
 	if err != nil {
 		return err
 	}
@@ -55,6 +56,8 @@ func ExecListSecretsAsJson(mctx *common.MorphContext, hosts []nix.Host) error {
 }
 
 func ExecUploadSecrets(mctx *common.MorphContext, hosts []nix.Host, phase *string) error {
+	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+
 	for _, host := range hosts {
 		if host.BuildOnly {
 			fmt.Fprintf(os.Stderr, "Secret upload is disabled for build-only host: %s\n", host.Name)
@@ -67,8 +70,8 @@ func ExecUploadSecrets(mctx *common.MorphContext, hosts []nix.Host, phase *strin
 			return err
 		}
 
-		if !mctx.Config.SkipHealthChecks {
-			err = healthchecks.PerformHealthChecks(mctx.SSHContext, &host, mctx.Config.Timeout)
+		if !mctx.Options.SkipHealthChecks {
+			err = healthchecks.PerformHealthChecks(sshCtx, &host, mctx.Options.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not uploading to additional hosts, since a host health check failed.")
@@ -81,9 +84,11 @@ func ExecUploadSecrets(mctx *common.MorphContext, hosts []nix.Host, phase *strin
 }
 
 func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *string) error {
+	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+
 	// upload secrets
 	// relative paths are resolved relative to the deployment file (!)
-	deploymentDir := filepath.Dir(mctx.Config.Deployment)
+	deploymentDir := filepath.Dir(mctx.Options.Deployment)
 	for _, host := range filteredHosts {
 		fmt.Fprintf(os.Stderr, "Uploading secrets to %s (%s):\n", host.Name, host.TargetHost)
 		postUploadActions := make(map[string][]string, 0)
@@ -99,7 +104,7 @@ func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *s
 				return err
 			}
 
-			secretErr := secrets.UploadSecret(mctx.SSHContext, &host, secret, deploymentDir)
+			secretErr := secrets.UploadSecret(sshCtx, &host, secret, deploymentDir)
 			fmt.Fprintf(os.Stderr, "\t* %s (%d bytes).. ", secretName, secretSize)
 			if secretErr != nil {
 				if secretErr.Fatal {
@@ -121,7 +126,7 @@ func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *s
 		for _, action := range postUploadActions {
 			fmt.Fprintf(os.Stderr, "\t- executing post-upload command: "+strings.Join(action, " ")+"\n")
 			// Errors from secret actions will be printed on screen, but we won't stop the flow if they fail
-			mctx.SSHContext.CmdInteractive(&host, mctx.Config.Timeout, action...)
+			sshCtx.CmdInteractive(&host, mctx.Options.Timeout, action...)
 		}
 	}
 

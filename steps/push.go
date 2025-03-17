@@ -7,6 +7,7 @@ import (
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
+	"github.com/DBCDK/morph/ssh"
 	"github.com/rs/zerolog/log"
 )
 
@@ -35,6 +36,8 @@ func (push *Push) UnmarshalJSON(b []byte) error {
 }
 
 func (push *Push) Run(ctx context.Context, mctx *common.MorphContext, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+
 	cacheKey := "closure:" + push.Host
 	log.Debug().Msg("cache key: " + cacheKey)
 	closure, err := cache_.Get(cacheKey)
@@ -44,7 +47,7 @@ func (push *Push) Run(ctx context.Context, mctx *common.MorphContext, hosts map[
 
 	log.Info().Msg(fmt.Sprintf("Pushing %s to %s\n", closure, hosts[push.Host].TargetHost))
 
-	err = nix.Push(mctx.SSHContext, hosts[push.Host], closure)
+	err = nix.Push(sshCtx, hosts[push.Host], closure)
 
 	return err
 }

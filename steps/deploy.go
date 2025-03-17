@@ -8,6 +8,7 @@ import (
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
+	"github.com/DBCDK/morph/ssh"
 	"github.com/rs/zerolog/log"
 )
 
@@ -133,6 +134,8 @@ func (action DeployTest) Run(ctx context.Context, mctx *common.MorphContext, all
 }
 
 func deploy(ctx context.Context, mctx *common.MorphContext, cache_ *cache.LockedMap[string], host nix.Host, deployAction string) error {
+	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+
 	log.Info().Msg(fmt.Sprintf("Executing %s on %s", deployAction, host.Name))
 
 	closure, err := cache_.Get("closure:" + host.Name)
@@ -140,7 +143,7 @@ func deploy(ctx context.Context, mctx *common.MorphContext, cache_ *cache.Locked
 		return err
 	}
 
-	err = mctx.SSHContext.ActivateConfiguration(&host, closure, deployAction)
+	err = sshCtx.ActivateConfiguration(&host, closure, deployAction)
 	if err != nil {
 		return err
 	}

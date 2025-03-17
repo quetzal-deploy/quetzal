@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/logging"
 	"io"
 	"os"
@@ -18,21 +19,6 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-type Context interface {
-	ActivateConfiguration(host Host, configuration string, action string) error
-	MakeTempFile(host Host) (path string, err error)
-	UploadFile(host Host, source string, destination string) error
-	SetOwner(host Host, path string, user string, group string) error
-	SetPermissions(host Host, path string, permissions string) error
-	MoveFile(host Host, source string, destination string) error
-	MakeDirs(host Host, path string, parents bool, mode os.FileMode) error
-	WaitForMountPoints(host Host, path string) error
-
-	Cmd(host Host, parts ...string) (*exec.Cmd, error)
-	SudoCmd(host Host, parts ...string) (*exec.Cmd, error)
-	CmdInteractive(host Host, timeout int, parts ...string)
-}
-
 type Host interface {
 	GetName() string
 	GetTargetHost() string
@@ -40,19 +26,19 @@ type Host interface {
 	GetTargetUser() string
 }
 
-type SSHContext struct {
-	sudoPassword           string
-	AskForSudoPassword     bool
-	GetSudoPasswordCommand string
-	DefaultUsername        string
-	IdentityFile           string
-	ConfigFile             string
-	SkipHostKeyCheck       bool
-}
-
 type FileTransfer struct {
 	Source      string
 	Destination string
+}
+
+type SSHContext struct {
+	SshOptions *common.SshOptions
+}
+
+func CreateSSHContext(sshOptions *common.SshOptions) *SSHContext {
+	return &SSHContext{
+		SshOptions: sshOptions,
+	}
 }
 
 func (sshCtx *SSHContext) Cmd(host Host, parts ...string) (*exec.Cmd, error) {
@@ -77,7 +63,7 @@ func (sshCtx *SSHContext) CmdContext(ctx context.Context, host Host, parts ...st
 	return command, nil
 }
 
-func (ctx *SSHContext) sshArgs(host Host, transfer *FileTransfer) (cmd string, args []string) {
+func (sshCtx *SSHContext) sshArgs(host Host, transfer *FileTransfer) (cmd string, args []string) {
 	if transfer != nil {
 		cmd = "scp"
 	} else {
@@ -85,17 +71,17 @@ func (ctx *SSHContext) sshArgs(host Host, transfer *FileTransfer) (cmd string, a
 	}
 	utils.ValidateEnvironment(cmd)
 
-	if ctx.SkipHostKeyCheck {
+	if sshCtx.SshOptions.SkipHostKeyCheck {
 		args = append(args,
 			"-o", "StrictHostKeyChecking=No",
 			"-o", "UserKnownHostsFile=/dev/null")
 	}
-	if ctx.IdentityFile != "" {
+	if sshCtx.SshOptions.IdentityFile != "" {
 		args = append(args, "-i")
-		args = append(args, ctx.IdentityFile)
+		args = append(args, sshCtx.SshOptions.IdentityFile)
 	}
-	if ctx.ConfigFile != "" {
-		args = append(args, "-F", ctx.ConfigFile)
+	if sshCtx.SshOptions.ConfigFile != "" {
+		args = append(args, "-F", sshCtx.SshOptions.ConfigFile)
 	}
 	var hostAndDestination = host.GetTargetHost()
 	if host.GetTargetPort() != 0 {
@@ -115,8 +101,8 @@ func (ctx *SSHContext) sshArgs(host Host, transfer *FileTransfer) (cmd string, a
 	}
 	if host.GetTargetUser() != "" {
 		hostAndDestination = host.GetTargetUser() + "@" + hostAndDestination
-	} else if ctx.DefaultUsername != "" {
-		hostAndDestination = ctx.DefaultUsername + "@" + hostAndDestination
+	} else if sshCtx.SshOptions.DefaultUsername != "" {
+		hostAndDestination = sshCtx.SshOptions.DefaultUsername + "@" + hostAndDestination
 	}
 	args = append(args, hostAndDestination)
 
@@ -134,13 +120,13 @@ func (sshCtx *SSHContext) SudoCmdContext(ctx context.Context, host Host, parts .
 	}
 
 	// ask for password if not done already
-	if sshCtx.AskForSudoPassword && sshCtx.sudoPassword == "" {
-		sshCtx.sudoPassword, err = askForSudoPassword()
+	if sshCtx.SshOptions.AskForSudoPassword && sshCtx.SshOptions.SudoPassword == "" {
+		sshCtx.SshOptions.SudoPassword, err = askForSudoPassword()
 		if err != nil {
 			return nil, err
 		}
-	} else if sshCtx.GetSudoPasswordCommand != "" {
-		command := strings.Fields(sshCtx.GetSudoPasswordCommand)
+	} else if sshCtx.SshOptions.GetSudoPasswordCommand != "" {
+		command := strings.Fields(sshCtx.SshOptions.GetSudoPasswordCommand)
 		var argsArr = []string{}
 		for i, e := range command {
 			if i != 0 {
@@ -153,7 +139,7 @@ func (sshCtx *SSHContext) SudoCmdContext(ctx context.Context, host Host, parts .
 		if err != nil {
 			panic(err)
 		}
-		sshCtx.sudoPassword = string(passOut)
+		sshCtx.SshOptions.SudoPassword = string(passOut)
 	}
 
 	cmd, cmdArgs := sshCtx.sshArgs(host, nil)
@@ -164,7 +150,7 @@ func (sshCtx *SSHContext) SudoCmdContext(ctx context.Context, host Host, parts .
 	}
 	cmdArgs = append(cmdArgs, "sudo")
 
-	if sshCtx.sudoPassword != "" {
+	if sshCtx.SshOptions.SudoPassword != "" {
 		cmdArgs = append(cmdArgs, "-S")
 	} else {
 		// no password supplied; request non-interactive sudo, which will fail with an error if a password was required
@@ -175,8 +161,8 @@ func (sshCtx *SSHContext) SudoCmdContext(ctx context.Context, host Host, parts .
 	cmdArgs = append(cmdArgs, parts...)
 
 	command := exec.CommandContext(ctx, cmd, cmdArgs...)
-	if sshCtx.sudoPassword != "" {
-		err := writeSudoPassword(command, sshCtx.sudoPassword)
+	if sshCtx.SshOptions.SudoPassword != "" {
+		err := writeSudoPassword(command, sshCtx.SshOptions.SudoPassword)
 		if err != nil {
 			return nil, err
 		}
@@ -243,10 +229,10 @@ func writeSudoPassword(cmd *exec.Cmd, sudoPasswd string) (err error) {
 	return nil
 }
 
-func (ctx *SSHContext) ActivateConfiguration(host Host, configuration string, action string) error {
+func (sshCtx *SSHContext) ActivateConfiguration(host Host, configuration string, action string) error {
 
 	if action == "switch" || action == "boot" {
-		cmd, err := ctx.SudoCmd(host, "nix-env", "--profile", "/nix/var/nix/profiles/system", "--set", configuration)
+		cmd, err := sshCtx.SudoCmd(host, "nix-env", "--profile", "/nix/var/nix/profiles/system", "--set", configuration)
 		if err != nil {
 			return err
 		}
@@ -265,7 +251,7 @@ func (ctx *SSHContext) ActivateConfiguration(host Host, configuration string, ac
 		cmd *exec.Cmd
 		err error
 	)
-	cmd, err = ctx.SudoCmd(host, args...)
+	cmd, err = sshCtx.SudoCmd(host, args...)
 	if err != nil {
 		return err
 	}
@@ -300,8 +286,8 @@ func (sshCtx *SSHContext) GetBootID(host Host) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-func (ctx *SSHContext) MakeTempFile(host Host) (path string, err error) {
-	cmd, _ := ctx.Cmd(host, "mktemp")
+func (sshCtx *SSHContext) MakeTempFile(host Host) (path string, err error) {
+	cmd, _ := sshCtx.Cmd(host, "mktemp")
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -322,8 +308,8 @@ func (ctx *SSHContext) MakeTempFile(host Host) (path string, err error) {
 	return tempFile, nil
 }
 
-func (ctx *SSHContext) UploadFile(host Host, source string, destination string) (err error) {
-	c, parts := ctx.sshArgs(host, &FileTransfer{
+func (sshCtx *SSHContext) UploadFile(host Host, source string, destination string) (err error) {
+	c, parts := sshCtx.sshArgs(host, &FileTransfer{
 		Source:      source,
 		Destination: destination,
 	})
@@ -341,7 +327,7 @@ func (ctx *SSHContext) UploadFile(host Host, source string, destination string) 
 	return nil
 }
 
-func (ctx *SSHContext) MakeDirs(host Host, path string, parents bool, mode os.FileMode) (err error) {
+func (sshCtx *SSHContext) MakeDirs(host Host, path string, parents bool, mode os.FileMode) (err error) {
 
 	parts := make([]string, 0)
 	parts = append(parts, "mkdir")
@@ -352,7 +338,7 @@ func (ctx *SSHContext) MakeDirs(host Host, path string, parents bool, mode os.Fi
 	parts = append(parts, fmt.Sprintf("%o", mode.Perm()))
 	parts = append(parts, path)
 
-	cmd, err := ctx.SudoCmd(host, parts...)
+	cmd, err := sshCtx.SudoCmd(host, parts...)
 	if err != nil {
 		return err
 	}
@@ -368,8 +354,8 @@ func (ctx *SSHContext) MakeDirs(host Host, path string, parents bool, mode os.Fi
 	return nil
 }
 
-func (ctx *SSHContext) MoveFile(host Host, source string, destination string) (err error) {
-	cmd, err := ctx.SudoCmd(host, "mv", source, destination)
+func (sshCtx *SSHContext) MoveFile(host Host, source string, destination string) (err error) {
+	cmd, err := sshCtx.SudoCmd(host, "mv", source, destination)
 	if err != nil {
 		return err
 	}
@@ -385,8 +371,8 @@ func (ctx *SSHContext) MoveFile(host Host, source string, destination string) (e
 	return nil
 }
 
-func (ctx *SSHContext) SetOwner(host Host, path string, user string, group string) (err error) {
-	cmd, err := ctx.SudoCmd(host, "chown", user+":"+group, path)
+func (sshCtx *SSHContext) SetOwner(host Host, path string, user string, group string) (err error) {
+	cmd, err := sshCtx.SudoCmd(host, "chown", user+":"+group, path)
 	if err != nil {
 		return err
 	}
@@ -402,8 +388,8 @@ func (ctx *SSHContext) SetOwner(host Host, path string, user string, group strin
 	return nil
 }
 
-func (ctx *SSHContext) SetPermissions(host Host, path string, permissions string) (err error) {
-	cmd, err := ctx.SudoCmd(host, "chmod", permissions, path)
+func (sshCtx *SSHContext) SetPermissions(host Host, path string, permissions string) (err error) {
+	cmd, err := sshCtx.SudoCmd(host, "chmod", permissions, path)
 	if err != nil {
 		return err
 	}
@@ -419,8 +405,8 @@ func (ctx *SSHContext) SetPermissions(host Host, path string, permissions string
 	return nil
 }
 
-func (ctx *SSHContext) WaitForMountPoints(host Host, path string) (err error) {
-	cmd, err := ctx.SudoCmd(host, "/run/current-system/sw/bin/systemd-run", "--collect", "--wait", "--property=RequiresMountsFor="+path, "true")
+func (sshCtx *SSHContext) WaitForMountPoints(host Host, path string) (err error) {
+	cmd, err := sshCtx.SudoCmd(host, "/run/current-system/sw/bin/systemd-run", "--collect", "--wait", "--property=RequiresMountsFor="+path, "true")
 	if err != nil {
 		return err
 	}
@@ -434,15 +420,4 @@ func (ctx *SSHContext) WaitForMountPoints(host Host, path string) (err error) {
 	}
 
 	return nil
-}
-
-func CreateSSHContext(askForSudoPasswd bool, passCmd string) *SSHContext {
-	return &SSHContext{
-		AskForSudoPassword:     askForSudoPasswd,
-		GetSudoPasswordCommand: passCmd,
-		IdentityFile:           os.Getenv("SSH_IDENTITY_FILE"),
-		DefaultUsername:        os.Getenv("SSH_USER"),
-		SkipHostKeyCheck:       os.Getenv("SSH_SKIP_HOST_KEY_CHECK") != "",
-		ConfigFile:             os.Getenv("SSH_CONFIG_FILE"),
-	}
 }

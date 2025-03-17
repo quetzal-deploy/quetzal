@@ -18,7 +18,6 @@ import (
 	"github.com/DBCDK/morph/events"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/planner"
-	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/steps"
 	"github.com/DBCDK/morph/ui"
 	"github.com/DBCDK/morph/utils"
@@ -103,8 +102,7 @@ func main() {
 	setup()
 
 	mctx := &common.MorphContext{
-		Config:     opts,
-		SSHContext: ssh.CreateSSHContext(opts.AskForSudoPasswd, opts.PassCmd),
+		Options:    opts,
 		NixContext: nix.GetNixContext(assetRoot, opts.ShowTrace, *opts.KeepGCRoot, *opts.AllowBuildShell),
 	}
 
@@ -141,8 +139,10 @@ func main() {
 		deploymentMetadata, hosts, err := cruft.GetHosts(mctx, opts.Deployment)
 		common.HandleError(err)
 
+		hostsMap := make(map[string]nix.Host)
+
 		for _, host := range hosts {
-			opts.HostsMap[host.Name] = host
+			hostsMap[host.Name] = host
 		}
 
 		plan := createPlan(cmdClauses, opts, hosts, clause)
@@ -231,7 +231,7 @@ func main() {
 			os.Exit(17)
 		}
 
-		megaContext := planner.NewMegaContext(eventManager, opts.HostsMap, mctx, constraints)
+		megaContext := planner.NewMegaContext(eventManager, hostsMap, mctx, constraints)
 
 		go planner.StepMonitor(megaContext.Steps, megaContext.StepStatus)
 

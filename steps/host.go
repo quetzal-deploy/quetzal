@@ -9,6 +9,7 @@ import (
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/logging"
 	"github.com/DBCDK/morph/nix"
+	"github.com/DBCDK/morph/ssh"
 )
 
 type IsOnline struct {
@@ -51,12 +52,14 @@ func (action *Reboot) UnmarshalJSON(b []byte) error {
 }
 
 func (action IsOnline) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
 	}
 
-	cmd, err := mctx.SSHContext.CmdContext(ctx, &host, "/bin/sh", "-c", "true")
+	cmd, err := sshCtx.CmdContext(ctx, &host, "/bin/sh", "-c", "true")
 	if err != nil {
 		return err
 	}
@@ -68,12 +71,14 @@ func (action IsOnline) Run(ctx context.Context, mctx *common.MorphContext, allHo
 	return err
 }
 func (action Reboot) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+
 	host, exists := allHosts[action.Host]
 	if !exists {
 		return errors.New("unknown host: " + action.Host)
 	}
 
-	err := host.Reboot(mctx.SSHContext)
+	err := host.Reboot(sshCtx)
 
 	return err
 }
