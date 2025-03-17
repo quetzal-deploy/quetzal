@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/rs/zerolog/log"
+
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/ssh"
-	"github.com/rs/zerolog/log"
 )
 
 type DeployBoot struct {
@@ -134,7 +136,7 @@ func (action DeployTest) Run(ctx context.Context, opts *common.MorphOptions, all
 }
 
 func deploy(ctx context.Context, opts *common.MorphOptions, cache_ *cache.LockedMap[string], host nix.Host, deployAction string) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	log.Info().Msg(fmt.Sprintf("Executing %s on %s", deployAction, host.Name))
 
@@ -143,7 +145,7 @@ func deploy(ctx context.Context, opts *common.MorphOptions, cache_ *cache.Locked
 		return err
 	}
 
-	err = sshCtx.ActivateConfiguration(&host, closure, deployAction)
+	err = sshContext.ActivateConfiguration(&host, closure, deployAction)
 	if err != nil {
 		return err
 	}

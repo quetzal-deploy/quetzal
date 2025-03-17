@@ -3,15 +3,16 @@ package cruft
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/healthchecks"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/secrets"
 	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/utils"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func ExecListSecrets(hosts []nix.Host) {
@@ -56,7 +57,7 @@ func ExecListSecretsAsJson(opts *common.MorphOptions, hosts []nix.Host) error {
 }
 
 func ExecUploadSecrets(opts *common.MorphOptions, hosts []nix.Host, phase *string) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	for _, host := range hosts {
 		if host.BuildOnly {
@@ -71,7 +72,7 @@ func ExecUploadSecrets(opts *common.MorphOptions, hosts []nix.Host, phase *strin
 		}
 
 		if !opts.SkipHealthChecks {
-			err = healthchecks.PerformHealthChecks(sshCtx, &host, opts.Timeout)
+			err = healthchecks.PerformHealthChecks(sshContext, &host, opts.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not uploading to additional hosts, since a host health check failed.")
@@ -84,7 +85,7 @@ func ExecUploadSecrets(opts *common.MorphOptions, hosts []nix.Host, phase *strin
 }
 
 func secretsUpload(opts *common.MorphOptions, filteredHosts []nix.Host, phase *string) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	// upload secrets
 	// relative paths are resolved relative to the deployment file (!)
@@ -104,7 +105,7 @@ func secretsUpload(opts *common.MorphOptions, filteredHosts []nix.Host, phase *s
 				return err
 			}
 
-			secretErr := secrets.UploadSecret(sshCtx, &host, secret, deploymentDir)
+			secretErr := secrets.UploadSecret(sshContext, &host, secret, deploymentDir)
 			fmt.Fprintf(os.Stderr, "\t* %s (%d bytes).. ", secretName, secretSize)
 			if secretErr != nil {
 				if secretErr.Fatal {
@@ -126,7 +127,7 @@ func secretsUpload(opts *common.MorphOptions, filteredHosts []nix.Host, phase *s
 		for _, action := range postUploadActions {
 			fmt.Fprintf(os.Stderr, "\t- executing post-upload command: "+strings.Join(action, " ")+"\n")
 			// Errors from secret actions will be printed on screen, but we won't stop the flow if they fail
-			sshCtx.CmdInteractive(&host, opts.Timeout, action...)
+			sshContext.CmdInteractive(&host, opts.Timeout, action...)
 		}
 	}
 

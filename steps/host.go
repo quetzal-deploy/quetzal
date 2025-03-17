@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/logging"
@@ -52,14 +53,14 @@ func (action *Reboot) UnmarshalJSON(b []byte) error {
 }
 
 func (action IsOnline) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
 	}
 
-	cmd, err := sshCtx.CmdContext(ctx, &host, "/bin/sh", "-c", "true")
+	cmd, err := sshContext.CmdContext(ctx, &host, "/bin/sh", "-c", "true")
 	if err != nil {
 		return err
 	}
@@ -71,14 +72,14 @@ func (action IsOnline) Run(ctx context.Context, opts *common.MorphOptions, allHo
 	return err
 }
 func (action Reboot) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	host, exists := allHosts[action.Host]
 	if !exists {
 		return errors.New("unknown host: " + action.Host)
 	}
 
-	err := host.Reboot(sshCtx)
+	err := host.Reboot(sshContext)
 
 	return err
 }

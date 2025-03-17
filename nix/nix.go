@@ -292,10 +292,10 @@ func GetBuildShell(nixOptions *common.NixOptions, deploymentPath string) (buildS
 	return buildShell, nil
 }
 
-func EvalHosts(opts *common.MorphOptions, deploymentPath string, attr string) (string, error) {
+func EvalHosts(opts *common.MorphOptions, deploymentPath string) (string, error) {
 	nixOptions := opts.NixOptions()
 
-	attribute := "nodes." + attr
+	attribute := "nodes." + opts.AttrKey
 
 	nixEvalInvocationArgs := NixEvalInvocationArgs{
 		AsJSON:         false,
@@ -370,7 +370,7 @@ func GetMachines(nixOptions *common.NixOptions, deploymentPath string) (deployme
 	return deployment, nil
 }
 
-func BuildMachines(opts *common.MorphOptions, deploymentPath string, hosts []Host, nixArgs []string, nixBuildTargets string) (resultPath string, err error) {
+func BuildMachines(opts *common.MorphOptions, hosts []Host, nixBuildTargets string) (resultPath string, err error) {
 	nixOptions := opts.NixOptions()
 
 	tmpdir, err := ioutil.TempDir("", "morph-")
@@ -386,7 +386,12 @@ func BuildMachines(opts *common.MorphOptions, deploymentPath string, hosts []Hos
 		hostNames = append(hostNames, host.Name)
 	}
 
-	resultLinkPath := filepath.Join(path.Dir(deploymentPath), ".gcroots", path.Base(deploymentPath))
+	deploymentAbsPath, err := filepath.Abs(opts.Deployment)
+	if err != nil {
+		return
+	}
+
+	resultLinkPath := filepath.Join(path.Dir(deploymentAbsPath), ".gcroots", path.Base(deploymentAbsPath))
 	if nixOptions.KeepGCRoot {
 		if err = os.MkdirAll(path.Dir(resultLinkPath), 0755); err != nil {
 			nixOptions.KeepGCRoot = false
@@ -398,7 +403,7 @@ func BuildMachines(opts *common.MorphOptions, deploymentPath string, hosts []Hos
 		resultLinkPath = filepath.Join(tmpdir, "result")
 	}
 
-	buildShell, err := GetBuildShell(nixOptions, deploymentPath)
+	buildShell, err := GetBuildShell(nixOptions, opts.Deployment)
 
 	if err != nil {
 		errorMessage := fmt.Sprintf(
@@ -411,9 +416,9 @@ func BuildMachines(opts *common.MorphOptions, deploymentPath string, hosts []Hos
 	NixBuildInvocationArgs := NixBuildInvocationArgs{
 		ArgsFile:        argsFile,
 		Attr:            "machines",
-		DeploymentPath:  deploymentPath,
+		DeploymentPath:  opts.Deployment,
 		Names:           hostNames,
-		NixArgs:         nixArgs,
+		NixArgs:         opts.NixBuildArg,
 		NixBuildTargets: nixBuildTargets,
 		NixConfig:       hosts[0].NixConfig,
 		NixOptions:      *nixOptions,
@@ -499,7 +504,7 @@ func GetPathsToPush(host Host, resultPath string) (paths []string, err error) {
 	return paths, nil
 }
 
-func Push(sshCtx *ssh.SSHContext, host Host, paths ...string) (err error) {
+func Push(sshContext *ssh.SSHContext, host Host, paths ...string) (err error) {
 	utils.ValidateEnvironment("ssh")
 
 	var userArg = ""
@@ -508,20 +513,20 @@ func Push(sshCtx *ssh.SSHContext, host Host, paths ...string) (err error) {
 	var env = os.Environ()
 	if host.TargetUser != "" {
 		userArg = host.TargetUser + "@"
-	} else if sshCtx.SshOptions.DefaultUsername != "" {
-		userArg = sshCtx.SshOptions.DefaultUsername + "@"
+	} else if sshContext.SshOptions.DefaultUsername != "" {
+		userArg = sshContext.SshOptions.DefaultUsername + "@"
 	}
-	if sshCtx.SshOptions.IdentityFile != "" {
-		keyArg = "?ssh-key=" + sshCtx.SshOptions.IdentityFile
+	if sshContext.SshOptions.IdentityFile != "" {
+		keyArg = "?ssh-key=" + sshContext.SshOptions.IdentityFile
 	}
-	if sshCtx.SshOptions.SkipHostKeyCheck {
+	if sshContext.SshOptions.SkipHostKeyCheck {
 		sshOpts = append(sshOpts, fmt.Sprintf("%s", "-o StrictHostkeyChecking=No -o UserKnownHostsFile=/dev/null"))
 	}
 	if host.TargetPort != 0 {
 		sshOpts = append(sshOpts, fmt.Sprintf("-p %d", host.TargetPort))
 	}
-	if sshCtx.SshOptions.ConfigFile != "" {
-		sshOpts = append(sshOpts, fmt.Sprintf("-F %s", sshCtx.SshOptions.ConfigFile))
+	if sshContext.SshOptions.ConfigFile != "" {
+		sshOpts = append(sshOpts, fmt.Sprintf("-F %s", sshContext.SshOptions.ConfigFile))
 	}
 	if len(sshOpts) > 0 {
 		env = append(env, fmt.Sprintf("NIX_SSHOPTS=%s", strings.Join(sshOpts, " ")))

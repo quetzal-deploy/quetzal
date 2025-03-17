@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/rs/zerolog/log"
+
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/ssh"
-	"github.com/rs/zerolog/log"
 )
 
 type Push struct {
@@ -36,7 +38,7 @@ func (push *Push) UnmarshalJSON(b []byte) error {
 }
 
 func (push *Push) Run(ctx context.Context, opts *common.MorphOptions, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	cacheKey := "closure:" + push.Host
 	log.Debug().Msg("cache key: " + cacheKey)
@@ -47,7 +49,7 @@ func (push *Push) Run(ctx context.Context, opts *common.MorphOptions, hosts map[
 
 	log.Info().Msg(fmt.Sprintf("Pushing %s to %s\n", closure, hosts[push.Host].TargetHost))
 
-	err = nix.Push(sshCtx, hosts[push.Host], closure)
+	err = nix.Push(sshContext, hosts[push.Host], closure)
 
 	return err
 }

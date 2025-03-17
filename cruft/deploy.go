@@ -3,17 +3,18 @@ package cruft
 import (
 	"errors"
 	"fmt"
-	"github.com/DBCDK/morph/ssh"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/filter"
 	"github.com/DBCDK/morph/healthchecks"
 	"github.com/DBCDK/morph/nix"
+	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/utils"
 )
 
@@ -26,7 +27,7 @@ func ExecBuild(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 }
 
 func ExecDeploy(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	doPush := false
 	doUploadSecrets := false
@@ -64,7 +65,7 @@ func ExecDeploy(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 		singleHostInList := []nix.Host{host}
 
 		if doPush {
-			err = pushPaths(sshCtx, singleHostInList, resultPath)
+			err = pushPaths(sshContext, singleHostInList, resultPath)
 			if err != nil {
 				return "", err
 			}
@@ -82,7 +83,7 @@ func ExecDeploy(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 		}
 
 		if !opts.SkipPreDeployChecks {
-			err := healthchecks.PerformPreDeployChecks(sshCtx, &host, opts.Timeout)
+			err := healthchecks.PerformPreDeployChecks(sshContext, &host, opts.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host pre-deploy check failed.")
@@ -98,7 +99,7 @@ func ExecDeploy(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 		}
 
 		if opts.DeployReboot {
-			err = host.Reboot(sshCtx)
+			err = host.Reboot(sshContext)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Reboot failed")
 				return "", err
@@ -116,7 +117,7 @@ func ExecDeploy(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 		}
 
 		if !opts.SkipHealthChecks {
-			err := healthchecks.PerformHealthChecks(sshCtx, &host, opts.Timeout)
+			err := healthchecks.PerformHealthChecks(sshContext, &host, opts.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host health check failed.")
@@ -137,13 +138,13 @@ func ExecEval(opts *common.MorphOptions) (string, error) {
 		return "", err
 	}
 
-	path, err := nix.EvalHosts(opts, deploymentPath, opts.AttrKey)
+	path, err := nix.EvalHosts(opts, deploymentPath)
 
 	return path, err
 }
 
 func ExecExecute(opts *common.MorphOptions, hosts []nix.Host) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	for _, host := range hosts {
 		if host.BuildOnly {
@@ -151,7 +152,7 @@ func ExecExecute(opts *common.MorphOptions, hosts []nix.Host) error {
 			continue
 		}
 		fmt.Fprintln(os.Stderr, "** "+host.Name)
-		sshCtx.CmdInteractive(&host, opts.Timeout, opts.ExecuteCommand...)
+		sshContext.CmdInteractive(&host, opts.Timeout, opts.ExecuteCommand...)
 		fmt.Fprintln(os.Stderr)
 	}
 
@@ -159,7 +160,7 @@ func ExecExecute(opts *common.MorphOptions, hosts []nix.Host) error {
 }
 
 func ExecHealthCheck(opts *common.MorphOptions, hosts []nix.Host) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	var err error
 	for _, host := range hosts {
@@ -167,7 +168,7 @@ func ExecHealthCheck(opts *common.MorphOptions, hosts []nix.Host) error {
 			fmt.Fprintf(os.Stderr, "Healthchecks are disabled for build-only host: %s\n", host.Name)
 			continue
 		}
-		err = healthchecks.PerformHealthChecks(sshCtx, &host, opts.Timeout)
+		err = healthchecks.PerformHealthChecks(sshContext, &host, opts.Timeout)
 	}
 
 	if err != nil {
@@ -178,7 +179,7 @@ func ExecHealthCheck(opts *common.MorphOptions, hosts []nix.Host) error {
 }
 
 func ExecPush(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	resultPath, err := ExecBuild(opts, hosts)
 	if err != nil {
@@ -186,7 +187,7 @@ func ExecPush(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 	}
 
 	fmt.Fprintln(os.Stderr)
-	return resultPath, pushPaths(sshCtx, hosts, resultPath)
+	return resultPath, pushPaths(sshContext, hosts, resultPath)
 }
 
 func GetHosts(opts *common.MorphOptions) (deploymentMetadata nix.DeploymentMetadata, hosts []nix.Host, err error) {
@@ -252,7 +253,7 @@ func GetHosts(opts *common.MorphOptions) (deploymentMetadata nix.DeploymentMetad
 }
 
 func activateConfiguration(opts *common.MorphOptions, filteredHosts []nix.Host, resultPath string) error {
-	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
+	sshContext := ssh.CreateSSHContext(opts)
 
 	fmt.Fprintln(os.Stderr, "Executing '"+opts.DeploySwitchAction+"' on matched hosts:")
 	fmt.Fprintln(os.Stderr)
@@ -265,7 +266,7 @@ func activateConfiguration(opts *common.MorphOptions, filteredHosts []nix.Host, 
 			return err
 		}
 
-		err = sshCtx.ActivateConfiguration(&host, configuration, opts.DeploySwitchAction)
+		err = sshContext.ActivateConfiguration(&host, configuration, opts.DeploySwitchAction)
 		if err != nil {
 			return err
 		}
@@ -282,11 +283,6 @@ func buildHosts(opts *common.MorphOptions, hosts []nix.Host) (resultPath string,
 		return
 	}
 
-	deploymentPath, err := filepath.Abs(opts.Deployment)
-	if err != nil {
-		return
-	}
-
 	nixBuildTargets := ""
 	if opts.NixBuildTargetFile != "" {
 		if path, err := filepath.Abs(opts.NixBuildTargetFile); err == nil {
@@ -296,7 +292,7 @@ func buildHosts(opts *common.MorphOptions, hosts []nix.Host) (resultPath string,
 		nixBuildTargets = fmt.Sprintf("{ \"out\" = %s; }", opts.NixBuildTarget)
 	}
 
-	resultPath, err = nix.BuildMachines(opts, deploymentPath, hosts, opts.NixBuildArg, nixBuildTargets)
+	resultPath, err = nix.BuildMachines(opts, hosts, nixBuildTargets)
 
 	if err != nil {
 		return
