@@ -83,7 +83,7 @@ func TestCanStartStepCardinality1(t *testing.T) {
 	constraints := make([]nix.Constraint, 0)
 	constraints = append(constraints, nix.NewConstraint(nix.LabelSelector{Label: label1Key, Value: label1Value}, 1))
 
-	mega := NewMegaContext(events.NewManager(), hosts, &opts, constraints)
+	planner := NewPlanner(events.NewManager(), hosts, &opts, constraints)
 
 	step1 := EmptyStep()
 	step2 := EmptyStep()
@@ -97,22 +97,22 @@ func TestCanStartStepCardinality1(t *testing.T) {
 	step2.Labels[label1Key] = label1Value
 	step3.Labels[label1Key] = label1Value
 
-	mega.Steps.Update(step1.Id, step1)
-	mega.Steps.Update(step2.Id, step2)
-	mega.Steps.Update(step3.Id, step3)
+	planner.Steps.Update(step1.Id, step1)
+	planner.Steps.Update(step2.Id, step2)
+	planner.Steps.Update(step3.Id, step3)
 
-	mega.QueueStep(step1)
-	mega.QueueStep(step2)
-	mega.QueueStep(step3)
+	planner.QueueStep(step1)
+	planner.QueueStep(step2)
+	planner.QueueStep(step3)
 
-	if !mega.CanStartStep(step1) {
+	if !planner.CanStartStep(step1) {
 		t.Fatalf("Expected to be able to start step = %s", step1.Id)
 	}
 
-	mega.StepStatus.Update(step1.Id, Running)
+	planner.StepStatus.Update(step1.Id, Running)
 
-	if mega.CanStartStep(step2) {
-		t.Fatalf("Should not be able to start step = %s with constraints = %v", step2.Id, mega.Constraints)
+	if planner.CanStartStep(step2) {
+		t.Fatalf("Should not be able to start step = %s with constraints = %v", step2.Id, planner.Constraints)
 	}
 }
 
@@ -129,7 +129,7 @@ func TestCanStartStepCardinality2(t *testing.T) {
 	//constraints = append(constraints, nix.NewConstraint(nix.LabelSelector{Label: "location", Value: "dc1"}, 1))
 	//constraints = append(constraints, nix.NewConstraint(nix.LabelSelector{Label: "location", Value: "dc2"}, 1))
 
-	mega := NewMegaContext(events.NewManager(), hosts, &opts, constraints)
+	planner := NewPlanner(events.NewManager(), hosts, &opts, constraints)
 
 	step1 := EmptyStep()
 	step2 := EmptyStep()
@@ -151,83 +151,83 @@ func TestCanStartStepCardinality2(t *testing.T) {
 	step3.Labels["location"] = "dc2"
 	step4.Labels["location"] = "dc2"
 
-	mega.Steps.Update(step1.Id, step1)
-	mega.Steps.Update(step2.Id, step2)
-	mega.Steps.Update(step3.Id, step3)
-	mega.Steps.Update(step4.Id, step3)
+	planner.Steps.Update(step1.Id, step1)
+	planner.Steps.Update(step2.Id, step2)
+	planner.Steps.Update(step3.Id, step3)
+	planner.Steps.Update(step4.Id, step3)
 
-	mega.QueueStep(step1)
-	mega.QueueStep(step2)
-	mega.QueueStep(step3)
-	mega.QueueStep(step4)
+	planner.QueueStep(step1)
+	planner.QueueStep(step2)
+	planner.QueueStep(step3)
+	planner.QueueStep(step4)
 
 	// Emulate starting step1. Should succeed.
-	if !mega.CanStartStep(step1) {
+	if !planner.CanStartStep(step1) {
 		t.Fatalf("Expected to be able to start step = %s", step1.Id)
 	}
 
 	// step1 is now started/running
-	mega.StepStatus.Update(step1.Id, Running)
+	planner.StepStatus.Update(step1.Id, Running)
 
 	// Emulate starting step2. Should fail since it has same location as step1.
-	if mega.CanStartStep(step2) {
-		t.Fatalf("Should not be able to start step = %s with constraints = %v", step2.Id, mega.Constraints)
+	if planner.CanStartStep(step2) {
+		t.Fatalf("Should not be able to start step = %s with constraints = %v", step2.Id, planner.Constraints)
 	}
 
 	// Emulate starting step3. Should succeed.
-	if !mega.CanStartStep(step3) {
-		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step3.Id, mega.Constraints)
+	if !planner.CanStartStep(step3) {
+		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step3.Id, planner.Constraints)
 	}
 
 	// reset step1
-	mega.StepStatus.Update(step1.Id, Queued)
+	planner.StepStatus.Update(step1.Id, Queued)
 
 	// Emulate starting step3. Should succeed.
-	if !mega.CanStartStep(step3) {
-		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step3.Id, mega.Constraints)
+	if !planner.CanStartStep(step3) {
+		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step3.Id, planner.Constraints)
 	}
 
 	// step2 is now started/running
-	mega.StepStatus.Update(step3.Id, Running)
+	planner.StepStatus.Update(step3.Id, Running)
 
 	// Emulate starting step4. Should fail since it has same location as step1.
-	if mega.CanStartStep(step4) {
-		t.Fatalf("Should not be able to start step = %s with constraints = %v", step4.Id, mega.Constraints)
+	if planner.CanStartStep(step4) {
+		t.Fatalf("Should not be able to start step = %s with constraints = %v", step4.Id, planner.Constraints)
 	}
 
 	// Emulate starting step2. Should succeed.
-	if !mega.CanStartStep(step2) {
-		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step3.Id, mega.Constraints)
+	if !planner.CanStartStep(step2) {
+		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step3.Id, planner.Constraints)
 	}
 
 	// step2 is now started/running
-	mega.StepStatus.Update(step3.Id, Done)
+	planner.StepStatus.Update(step3.Id, Done)
 
 	// Emulate starting step4. Should succeed.
-	if !mega.CanStartStep(step4) {
-		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step4.Id, mega.Constraints)
+	if !planner.CanStartStep(step4) {
+		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step4.Id, planner.Constraints)
 	}
 
-	mega.StepStatus.Update(step4.Id, Done)
+	planner.StepStatus.Update(step4.Id, Done)
 
 	// Emulate starting step1. Should succeed.
-	if !mega.CanStartStep(step1) {
-		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step1.Id, mega.Constraints)
+	if !planner.CanStartStep(step1) {
+		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step1.Id, planner.Constraints)
 	}
 
-	mega.StepStatus.Update(step1.Id, Running)
+	planner.StepStatus.Update(step1.Id, Running)
 
 	// Emulate starting step2. Should fail since it has same location as step1.
-	if mega.CanStartStep(step2) {
-		t.Fatalf("Should not be able to start step = %s with constraints = %v", step2.Id, mega.Constraints)
+	if planner.CanStartStep(step2) {
+		t.Fatalf("Should not be able to start step = %s with constraints = %v", step2.Id, planner.Constraints)
 	}
 
-	mega.StepStatus.Update(step1.Id, Done)
+	planner.StepStatus.Update(step1.Id, Done)
 
 	// Emulate starting step2. Should succeed.
-	if !mega.CanStartStep(step2) {
-		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step2.Id, mega.Constraints)
+	if !planner.CanStartStep(step2) {
+		t.Fatalf("Expected to be able to start step = %s with constraints = %v", step2.Id, planner.Constraints)
 	}
 
-	mega.StepStatus.Update(step2.Id, Done)
+	planner.StepStatus.Update(step2.Id, Done)
 }

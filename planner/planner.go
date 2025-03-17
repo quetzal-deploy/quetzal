@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/DBCDK/morph/cache"
+	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/events"
 	"github.com/DBCDK/morph/logging"
+	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/steps"
 	"github.com/crillab/gophersat/solver"
 	"github.com/rs/zerolog"
@@ -13,6 +15,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -27,32 +30,64 @@ const (
 
 // FIXME: IDEA: Deployment simulation - make a fake MorphContext where things like SSH-calls are faked and logged instead
 
-func (mega *MegaContext) Run(ctx context.Context) error {
-	mega.context = ctx
+type Planner struct {
+	Hosts        map[string]nix.Host
+	MorphOptions *common.MorphOptions
+	Cache        *cache.LockedMap[string]
+	StepStatus   *cache.LockedMap[string]
+	Steps        *cache.LockedMap[steps.Step]
+	Constraints  []nix.Constraint
+	EventManager *events.Manager
+
+	context     context.Context
+	tickChan    chan bool
+	queueLock   sync.RWMutex
+	queuedSteps []steps.Step // steps awaiting processing
+	retryCounts *cache.LockedMap[int]
+}
+
+func NewPlanner(eventMgr *events.Manager, hosts map[string]nix.Host, opts *common.MorphOptions, constraints []nix.Constraint) *Planner {
+	return &Planner{
+		Hosts:        hosts,
+		MorphOptions: opts,
+
+		Constraints: constraints,
+
+		EventManager: eventMgr,
+
+		Cache:       cache.NewLockedMap[string]("cache"),
+		StepStatus:  cache.NewLockedMap[string]("steps-done"),
+		Steps:       cache.NewLockedMap[steps.Step]("steps"),
+		retryCounts: cache.NewLockedMap[int]("retries"),
+	}
+}
+
+func (planner *Planner) Run(ctx context.Context) error {
+	planner.context = ctx
 
 	// FIXME: This doesn't terminate
-	for len(mega.queuedSteps) > 0 || len(mega.StepsNotTerminated()) > 0 {
+	for len(planner.queuedSteps) > 0 || len(planner.StepsNotTerminated()) > 0 {
 		// Run everything needed for every iteration
-		mega.processQueue()
+		planner.processQueue()
 
 		time.Sleep(time.Second)
 
 		// Wait for next tick
 		// FIXME: make ticking work (and not block)
-		//<-mega.tickChan
+		//<-planner.tickChan
 	}
 	return nil
 }
 
-func (mega *MegaContext) tick() {
+func (planner *Planner) tick() {
 	// FIXME: Ticking disabled
-	//mega.tickChan <- true
+	//planner.tickChan <- true
 }
 
-func (mega *MegaContext) StepsNotTerminated() []string {
+func (planner *Planner) StepsNotTerminated() []string {
 	notTerminated := make([]string, 0)
 
-	for stepId, status := range mega.StepStatus.GetCopy() {
+	for stepId, status := range planner.StepStatus.GetCopy() {
 		if status != Done && status != Failed {
 			notTerminated = append(notTerminated, stepId)
 		}
@@ -61,12 +96,12 @@ func (mega *MegaContext) StepsNotTerminated() []string {
 	return notTerminated
 }
 
-func (mega *MegaContext) processQueue() {
+func (planner *Planner) processQueue() {
 
 	//remove steps that have been started from the queue!
 
-	mega.queueLock.Lock()
-	defer mega.queueLock.Unlock()
+	planner.queueLock.Lock()
+	defer planner.queueLock.Unlock()
 
 	stepsStillQueued := make([]steps.Step, 0)
 	stepStatuses := make([]events.StepStatus, 0)
@@ -75,18 +110,18 @@ func (mega *MegaContext) processQueue() {
 	zLogAfter := zerolog.Arr()
 	zLogStarted := zerolog.Arr()
 
-	for _, step := range mega.queuedSteps {
+	for _, step := range planner.queuedSteps {
 		zLogBefore.Str(step.Id)
 
 		// TODO: log if rejected by dependencies or the solver
-		dependenciesSatisfied, blockedBy := mega.DependenciesSatisfied(step.DependsOn)
-		//solverSatisfied := mega.CanStartStep(step, mega.Steps.GetCopy(), mega.StepStatus.GetCopy(), mega.Constraints)
-		solverSatisfied := mega.CanStartStep(step)
+		dependenciesSatisfied, blockedBy := planner.DependenciesSatisfied(step.DependsOn)
+		//solverSatisfied := planner.CanStartStep(step, planner.Steps.GetCopy(), planner.StepStatus.GetCopy(), planner.Constraints)
+		solverSatisfied := planner.CanStartStep(step)
 
-		//if dependenciesSatisfied, blockedBy := mega.DependenciesSatisfied(step.DependsOn); dependenciesSatisfied && mega.CanStartStep(step) {
+		//if dependenciesSatisfied, blockedBy := planner.DependenciesSatisfied(step.DependsOn); dependenciesSatisfied && planner.CanStartStep(step) {
 		if dependenciesSatisfied && solverSatisfied {
 			// FIXME: This appears to not be taken into account in the solver:
-			mega.UpdateStepStatus(step.Id, Running)
+			planner.UpdateStepStatus(step.Id, Running)
 			log.Info().
 				Str("component", "solver").
 				Msg("!!!!!!!!!!!!!!!!!!!!")
@@ -96,31 +131,31 @@ func (mega *MegaContext) processQueue() {
 
 			go func() {
 				// FIXME: use errgroup here instead to have a shared group for everything running
-				err := mega.ExecuteStep(context.TODO(), step)
+				err := planner.ExecuteStep(context.TODO(), step)
 
 				if err != nil {
 					switch step.OnFailure {
 					case "retry":
-						mega.UpdateStepStatus(step.Id, Queued)
+						planner.UpdateStepStatus(step.Id, Queued)
 						log.Error().Err(err).Msg("Error while running step (retrying)")
 
-						mega.retryCounts.Run(step.Id, 0, func(value int) int {
+						planner.retryCounts.Run(step.Id, 0, func(value int) int {
 							return value + 1 // FIXME: Test that this actually works
 						})
 
-						mega.QueueStep(step) // FIXME: Handle step status update
+						planner.QueueStep(step) // FIXME: Handle step status update
 
 					case "ignore":
-						mega.UpdateStepStatus(step.Id, Failed)
+						planner.UpdateStepStatus(step.Id, Failed)
 						log.Error().Err(err).Msg("Error while running step (ignored)")
 
 					default: // propagate error
-						mega.UpdateStepStatus(step.Id, Failed)
+						planner.UpdateStepStatus(step.Id, Failed)
 
 						// FIXME: stop processing on err
 					}
 				} else {
-					mega.UpdateStepStatus(step.Id, Done)
+					planner.UpdateStepStatus(step.Id, Done)
 				}
 			}()
 			zLogStarted.Str(step.Id)
@@ -138,9 +173,9 @@ func (mega *MegaContext) processQueue() {
 		}
 	}
 
-	mega.queuedSteps = stepsStillQueued
+	planner.queuedSteps = stepsStillQueued
 
-	mega.EventManager.SendEvent(events.QueueStatus{
+	planner.EventManager.SendEvent(events.QueueStatus{
 		Queue: stepStatuses,
 	})
 
@@ -152,47 +187,47 @@ func (mega *MegaContext) processQueue() {
 		Msg("finished going through the processing queue")
 }
 
-func (mega *MegaContext) UpdateStepStatus(stepId string, status string) {
+func (planner *Planner) UpdateStepStatus(stepId string, status string) {
 	log.Info().
 		Str("event", "step-status").
 		Str("step", stepId).
 		Str("status", status).
 		Msg("step update")
 
-	mega.StepStatus.Update(stepId, status)
+	planner.StepStatus.Update(stepId, status)
 
-	mega.EventManager.SendEvent(events.StepUpdate{
+	planner.EventManager.SendEvent(events.StepUpdate{
 		StepId: stepId,
 		State:  status,
 	})
 
-	mega.tick()
+	planner.tick()
 }
 
-func (mega *MegaContext) QueueStep(step steps.Step) {
-	mega.queueLock.Lock()
-	defer mega.queueLock.Unlock()
+func (planner *Planner) QueueStep(step steps.Step) {
+	planner.queueLock.Lock()
+	defer planner.queueLock.Unlock()
 
 	// register the step
-	mega.Steps.Update(step.Id, step)
+	planner.Steps.Update(step.Id, step)
 
-	mega.EventManager.SendEvent(events.RegisterStep{Step: step})
+	planner.EventManager.SendEvent(events.RegisterStep{Step: step})
 
-	mega.queuedSteps = append(mega.queuedSteps, step)
+	planner.queuedSteps = append(planner.queuedSteps, step)
 
-	mega.UpdateStepStatus(step.Id, Queued)
+	planner.UpdateStepStatus(step.Id, Queued)
 }
 
-func (mega *MegaContext) QueueSteps(steps ...steps.Step) {
+func (planner *Planner) QueueSteps(steps ...steps.Step) {
 	for _, step := range steps {
 		log.Debug().Msg("queueing step: " + step.Id)
-		mega.QueueStep(step)
+		planner.QueueStep(step)
 	}
 }
 
-func StepMonitor(stepsDb *cache.LockedMap[steps.Step], m *cache.LockedMap[string]) {
+func (planner *Planner) StepMonitor() {
 	for {
-		data := m.GetCopy()
+		data := planner.StepStatus.GetCopy()
 
 		stepIds := make([]string, 0)
 		for stepId, _ := range data {
@@ -202,7 +237,7 @@ func StepMonitor(stepsDb *cache.LockedMap[steps.Step], m *cache.LockedMap[string
 		sort.Strings(stepIds)
 
 		for _, stepId := range stepIds {
-			step, _ := stepsDb.Get(stepId)
+			step, _ := planner.Steps.Get(stepId)
 			log.Debug().
 				Dict("step", zerolog.Dict().
 					Str("id", step.Id).
@@ -214,7 +249,7 @@ func StepMonitor(stepsDb *cache.LockedMap[steps.Step], m *cache.LockedMap[string
 	}
 }
 
-//func waitForSlot(megaContext *MegaContext, step steps.Step) Slot {
+//func waitForSlot(planner *Planner, step steps.Step) Slot {
 //	// Der er noget med tags og bla bla, steps har fx ikke tags eller labels lige nu, og
 //	// dette skal eksplicit ikke være på host-niveau men på step-niveau
 //
@@ -233,7 +268,7 @@ func StepMonitor(stepsDb *cache.LockedMap[steps.Step], m *cache.LockedMap[string
 //		partialMatch := false
 //		var channel chan bool
 //
-//		for _, constraint := range megaContext.Constraints {
+//		for _, constraint := range planner.Constraints {
 //			if c, err := constraint.GetChan(label, value); err != nil {
 //				// no match, ignore
 //				continue
@@ -264,7 +299,7 @@ func StepMonitor(stepsDb *cache.LockedMap[steps.Step], m *cache.LockedMap[string
 //}
 
 // FIXME: return err when dependencies cannot be satisfied, e.g. in case of dependency that failed
-func (mega *MegaContext) DependenciesSatisfied(dependencies []string) (bool, []string) {
+func (planner *Planner) DependenciesSatisfied(dependencies []string) (bool, []string) {
 	dependenciesNotSatisfied := make([]string, 0)
 
 	if len(dependencies) == 0 {
@@ -272,7 +307,7 @@ func (mega *MegaContext) DependenciesSatisfied(dependencies []string) (bool, []s
 	}
 
 	for _, dependency := range dependencies {
-		status, err := mega.StepStatus.Get(dependency)
+		status, err := planner.StepStatus.Get(dependency)
 		if err != nil {
 			// Not started
 			dependenciesNotSatisfied = append(dependenciesNotSatisfied, dependency)
@@ -311,7 +346,7 @@ func weightsOfOnes(numberOfOnes int) []int {
 }
 
 // Make sure to lock the queue before calling this, or results will be inconsistent
-func (mega *MegaContext) CanStartStep(step steps.Step) bool {
+func (planner *Planner) CanStartStep(step steps.Step) bool {
 	//func CanStartStep(step steps.Step, allSteps map[string]steps.Step, stepStatus map[string]string, constraints []nix.Constraint) bool {
 	log.Debug().
 		Str("component", "solver").Str("stepId", step.Id).
@@ -330,12 +365,12 @@ func (mega *MegaContext) CanStartStep(step steps.Step) bool {
 	//ids := []string{step.Id}
 	ids := []string{}
 	idStepIdMap := make(map[int]string)
-	allSteps := mega.Steps.GetCopy()
+	allSteps := planner.Steps.GetCopy()
 	allStepsIds := slices.Sorted(maps.Keys(allSteps))
 
 	zLogStepDict := zerolog.Dict()
 
-	for _, constraint := range mega.Constraints {
+	for _, constraint := range planner.Constraints {
 		//fmt.Printf("solver: constraint = %v\n", constraint)
 
 		//for _, constraint := range constraints {
@@ -384,7 +419,7 @@ func (mega *MegaContext) CanStartStep(step steps.Step) bool {
 			for _, i := range matchingIds {
 				//fmt.Printf("matching id = %d\n", i)
 				id := ids[i-1]
-				status, err := mega.StepStatus.Get(id)
+				status, err := planner.StepStatus.Get(id)
 				//status, ok := stepStatus[id]
 				if err != nil {
 					// TODO: Log fatal here
@@ -483,14 +518,14 @@ func (mega *MegaContext) CanStartStep(step steps.Step) bool {
 	return status == solver.Sat
 }
 
-func (mega *MegaContext) waitForChildrenToComplete(ctx context.Context, step steps.Step) {
+func (planner *Planner) waitForChildrenToComplete(ctx context.Context, step steps.Step) {
 	childIds := make([]string, 0)
 	for _, subStep := range step.Steps {
 		childIds = append(childIds, subStep.Id)
 	}
 
 	for {
-		if satisfied, _ := mega.DependenciesSatisfied(childIds); satisfied {
+		if satisfied, _ := planner.DependenciesSatisfied(childIds); satisfied {
 			return
 		} else {
 			time.Sleep(time.Second)
@@ -498,15 +533,15 @@ func (mega *MegaContext) waitForChildrenToComplete(ctx context.Context, step ste
 	}
 }
 
-func (mega *MegaContext) ExecuteStep(ctx context.Context, step steps.Step) error {
-	err := step.Action.Run(ctx, mega.MorphOptions, mega.Hosts, mega.Cache)
+func (planner *Planner) ExecuteStep(ctx context.Context, step steps.Step) error {
+	err := step.Action.Run(ctx, planner.MorphOptions, planner.Hosts, planner.Cache)
 	if err != nil {
 		return err
 	}
 
 	if step.Parallel {
 		// queue all steps
-		mega.QueueSteps(step.Steps...)
+		planner.QueueSteps(step.Steps...)
 	} else {
 		// queue all steps but first make them depend on each other in order
 		// (first sub step will depend on nothing extra)
@@ -522,11 +557,11 @@ func (mega *MegaContext) ExecuteStep(ctx context.Context, step steps.Step) error
 
 			previousStepId = subStep.Id
 
-			mega.QueueStep(subStep)
+			planner.QueueStep(subStep)
 		}
 	}
 
-	mega.waitForChildrenToComplete(ctx, step)
+	planner.waitForChildrenToComplete(ctx, step)
 
 	return nil
 }

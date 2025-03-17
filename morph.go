@@ -226,13 +226,13 @@ func main() {
 			os.Exit(17)
 		}
 
-		megaContext := planner.NewMegaContext(eventManager, hostsMap, opts, constraints)
+		planner_ := planner.NewPlanner(eventManager, hostsMap, opts, constraints)
 
-		go planner.StepMonitor(megaContext.Steps, megaContext.StepStatus)
+		go planner_.StepMonitor()
 
-		megaContext.QueueStep(plan)
+		planner_.QueueStep(plan)
 
-		err = megaContext.Run(context.TODO())
+		err = planner_.Run(context.TODO())
 		if err != nil {
 			log.Error().Err(err).Msg("Error while running step") // FIXME: Log the offending step/action somehow
 			// FIXME: Dump the plan with status on what was done, and what wasn't, so it can be resumed

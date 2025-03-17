@@ -63,8 +63,8 @@ func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
 }
 
 type model struct {
-	mega  *planner.MegaContext
-	ready bool
+	planner *planner.Planner
+	ready   bool
 
 	width  int
 	height int
