@@ -75,7 +75,7 @@ func TestWeightsOfOnes(t *testing.T) {
 
 func TestCanStartStepCardinality1(t *testing.T) {
 	hosts := make(map[string]nix.Host)
-	mctx := common.MorphContext{}
+	opts := common.MorphOptions{}
 
 	label1Key := "type"
 	label1Value := "web"
@@ -83,7 +83,7 @@ func TestCanStartStepCardinality1(t *testing.T) {
 	constraints := make([]nix.Constraint, 0)
 	constraints = append(constraints, nix.NewConstraint(nix.LabelSelector{Label: label1Key, Value: label1Value}, 1))
 
-	mega := NewMegaContext(events.NewManager(), hosts, &mctx, constraints)
+	mega := NewMegaContext(events.NewManager(), hosts, &opts, constraints)
 
 	step1 := EmptyStep()
 	step2 := EmptyStep()
@@ -118,7 +118,7 @@ func TestCanStartStepCardinality1(t *testing.T) {
 
 func TestCanStartStepCardinality2(t *testing.T) {
 	hosts := make(map[string]nix.Host)
-	mctx := common.MorphContext{}
+	opts := common.MorphOptions{}
 
 	label1Key := "type"
 	label1Value := "web"
@@ -129,7 +129,7 @@ func TestCanStartStepCardinality2(t *testing.T) {
 	//constraints = append(constraints, nix.NewConstraint(nix.LabelSelector{Label: "location", Value: "dc1"}, 1))
 	//constraints = append(constraints, nix.NewConstraint(nix.LabelSelector{Label: "location", Value: "dc2"}, 1))
 
-	mega := NewMegaContext(events.NewManager(), hosts, &mctx, constraints)
+	mega := NewMegaContext(events.NewManager(), hosts, &opts, constraints)
 
 	step1 := EmptyStep()
 	step2 := EmptyStep()

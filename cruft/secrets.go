@@ -26,8 +26,8 @@ func ExecListSecrets(hosts []nix.Host) {
 	}
 }
 
-func ExecListSecretsAsJson(mctx *common.MorphContext, hosts []nix.Host) error {
-	deploymentDir, err := filepath.Abs(filepath.Dir(mctx.Options.Deployment))
+func ExecListSecretsAsJson(opts *common.MorphOptions, hosts []nix.Host) error {
+	deploymentDir, err := filepath.Abs(filepath.Dir(opts.Deployment))
 	if err != nil {
 		return err
 	}
@@ -55,8 +55,8 @@ func ExecListSecretsAsJson(mctx *common.MorphContext, hosts []nix.Host) error {
 	return nil
 }
 
-func ExecUploadSecrets(mctx *common.MorphContext, hosts []nix.Host, phase *string) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func ExecUploadSecrets(opts *common.MorphOptions, hosts []nix.Host, phase *string) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	for _, host := range hosts {
 		if host.BuildOnly {
@@ -65,13 +65,13 @@ func ExecUploadSecrets(mctx *common.MorphContext, hosts []nix.Host, phase *strin
 		}
 		singleHostInList := []nix.Host{host}
 
-		err := secretsUpload(mctx, singleHostInList, phase)
+		err := secretsUpload(opts, singleHostInList, phase)
 		if err != nil {
 			return err
 		}
 
-		if !mctx.Options.SkipHealthChecks {
-			err = healthchecks.PerformHealthChecks(sshCtx, &host, mctx.Options.Timeout)
+		if !opts.SkipHealthChecks {
+			err = healthchecks.PerformHealthChecks(sshCtx, &host, opts.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not uploading to additional hosts, since a host health check failed.")
@@ -83,12 +83,12 @@ func ExecUploadSecrets(mctx *common.MorphContext, hosts []nix.Host, phase *strin
 	return nil
 }
 
-func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *string) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func secretsUpload(opts *common.MorphOptions, filteredHosts []nix.Host, phase *string) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	// upload secrets
 	// relative paths are resolved relative to the deployment file (!)
-	deploymentDir := filepath.Dir(mctx.Options.Deployment)
+	deploymentDir := filepath.Dir(opts.Deployment)
 	for _, host := range filteredHosts {
 		fmt.Fprintf(os.Stderr, "Uploading secrets to %s (%s):\n", host.Name, host.TargetHost)
 		postUploadActions := make(map[string][]string, 0)
@@ -126,7 +126,7 @@ func secretsUpload(mctx *common.MorphContext, filteredHosts []nix.Host, phase *s
 		for _, action := range postUploadActions {
 			fmt.Fprintf(os.Stderr, "\t- executing post-upload command: "+strings.Join(action, " ")+"\n")
 			// Errors from secret actions will be printed on screen, but we won't stop the flow if they fail
-			sshCtx.CmdInteractive(&host, mctx.Options.Timeout, action...)
+			sshCtx.CmdInteractive(&host, opts.Timeout, action...)
 		}
 	}
 

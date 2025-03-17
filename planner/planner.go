@@ -499,7 +499,7 @@ func (mega *MegaContext) waitForChildrenToComplete(ctx context.Context, step ste
 }
 
 func (mega *MegaContext) ExecuteStep(ctx context.Context, step steps.Step) error {
-	err := step.Action.Run(ctx, mega.MorphContext, mega.Hosts, mega.Cache)
+	err := step.Action.Run(ctx, mega.MorphOptions, mega.Hosts, mega.Cache)
 	if err != nil {
 		return err
 	}

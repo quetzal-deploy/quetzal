@@ -14,8 +14,7 @@ import (
 
 type MegaContext struct {
 	Hosts        map[string]nix.Host
-	MorphContext *common.MorphContext
-	NixContext   *common.NixContext
+	MorphOptions *common.MorphOptions
 	Cache        *cache.LockedMap[string]
 	StepStatus   *cache.LockedMap[string]
 	Steps        *cache.LockedMap[steps.Step]
@@ -29,11 +28,10 @@ type MegaContext struct {
 	retryCounts *cache.LockedMap[int]
 }
 
-func NewMegaContext(eventMgr *events.Manager, hosts map[string]nix.Host, morphContext *common.MorphContext, constraints []nix.Constraint) *MegaContext {
+func NewMegaContext(eventMgr *events.Manager, hosts map[string]nix.Host, opts *common.MorphOptions, constraints []nix.Constraint) *MegaContext {
 	return &MegaContext{
 		Hosts:        hosts,
-		MorphContext: morphContext,
-		NixContext:   morphContext.NixContext,
+		MorphOptions: opts,
 
 		Constraints: constraints,
 

@@ -35,8 +35,8 @@ func (push *Push) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, push)
 }
 
-func (push *Push) Run(ctx context.Context, mctx *common.MorphContext, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func (push *Push) Run(ctx context.Context, opts *common.MorphOptions, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	cacheKey := "closure:" + push.Host
 	log.Debug().Msg("cache key: " + cacheKey)

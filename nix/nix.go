@@ -83,36 +83,6 @@ type Deployment struct {
 	Meta  DeploymentMetadata `json:"meta"`
 }
 
-func GetNixContext(assetRoot string, showTrace bool, keepGCRoot bool, allowBuildShell bool) *common.NixContext {
-	evalCmd := os.Getenv("MORPH_NIX_EVAL_CMD")
-	buildCmd := os.Getenv("MORPH_NIX_BUILD_CMD")
-	shellCmd := os.Getenv("MORPH_NIX_SHELL_CMD")
-	evalMachines := os.Getenv("MORPH_NIX_EVAL_MACHINES")
-
-	if evalCmd == "" {
-		evalCmd = "nix-instantiate"
-	}
-	if buildCmd == "" {
-		buildCmd = "nix-build"
-	}
-	if shellCmd == "" {
-		shellCmd = "nix-shell"
-	}
-	if evalMachines == "" {
-		evalMachines = filepath.Join(assetRoot, "eval-machines.nix")
-	}
-
-	return &common.NixContext{
-		EvalCmd:         evalCmd,
-		BuildCmd:        buildCmd,
-		ShellCmd:        shellCmd,
-		EvalMachines:    evalMachines,
-		ShowTrace:       showTrace,
-		KeepGCRoot:      keepGCRoot,
-		AllowBuildShell: allowBuildShell,
-	}
-}
-
 type NixBuildInvocationArgs struct {
 	ArgsFile        string
 	Attr            string
@@ -121,13 +91,13 @@ type NixBuildInvocationArgs struct {
 	NixArgs         []string
 	NixBuildTargets string
 	NixConfig       map[string]string
-	NixContext      common.NixContext
+	NixOptions      common.NixOptions
 	ResultLinkPath  string
 }
 
 func (nArgs *NixBuildInvocationArgs) ToNixBuildArgs() []string {
 	args := []string{
-		nArgs.NixContext.EvalMachines,
+		nArgs.NixOptions.EvalMachines,
 		"--arg", "networkExpr", nArgs.DeploymentPath,
 		"--argstr", "argsFile", nArgs.ArgsFile,
 		"--out-link", nArgs.ResultLinkPath,
@@ -140,7 +110,7 @@ func (nArgs *NixBuildInvocationArgs) ToNixBuildArgs() []string {
 		args = append(args, nArgs.NixArgs...)
 	}
 
-	if nArgs.NixContext.ShowTrace {
+	if nArgs.NixOptions.ShowTrace {
 		args = append(args, "--show-trace")
 	}
 
@@ -154,13 +124,13 @@ func (nArgs *NixBuildInvocationArgs) ToNixBuildArgs() []string {
 
 func (nArgs *NixEvalInvocationArgs) ToNixInstantiateArgs() []string {
 	args := []string{
-		"--eval", nArgs.NixContext.EvalMachines,
+		"--eval", nArgs.NixOptions.EvalMachines,
 		"--arg", "networkExpr", nArgs.DeploymentPath,
 		"--argstr", "argsFile", nArgs.ArgsFile,
 		"--attr", nArgs.Attr,
 	}
 
-	if nArgs.NixContext.ShowTrace {
+	if nArgs.NixOptions.ShowTrace {
 		args = append(args, "--show-trace")
 	}
 
@@ -184,7 +154,7 @@ type NixEvalInvocationArgs struct {
 	ArgsFile       string
 	Attr           string
 	DeploymentPath string
-	NixContext     common.NixContext
+	NixOptions     common.NixOptions
 	Strict         bool
 	ReadWriteMode  bool
 }
@@ -278,13 +248,13 @@ func (host *Host) Reboot(sshContext *ssh.SSHContext) error {
 	return nil
 }
 
-func GetBuildShell(ctx *common.NixContext, deploymentPath string) (buildShell *string, err error) {
+func GetBuildShell(nixOptions *common.NixOptions, deploymentPath string) (buildShell *string, err error) {
 
 	nixEvalInvocationArgs := NixEvalInvocationArgs{
 		AsJSON:         true,
 		Attr:           "info.buildShell",
 		DeploymentPath: deploymentPath,
-		NixContext:     *ctx,
+		NixOptions:     *nixOptions,
 		Strict:         true,
 	}
 
@@ -293,7 +263,7 @@ func GetBuildShell(ctx *common.NixContext, deploymentPath string) (buildShell *s
 		return buildShell, err
 	}
 
-	cmd := exec.Command(ctx.EvalCmd, nixEvalInvocationArgs.ToNixInstantiateArgs()...)
+	cmd := exec.Command(nixOptions.EvalCmd, nixEvalInvocationArgs.ToNixInstantiateArgs()...)
 
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
@@ -309,7 +279,7 @@ func GetBuildShell(ctx *common.NixContext, deploymentPath string) (buildShell *s
 	err = cmd.Run()
 	if err != nil {
 		errorMessage := fmt.Sprintf(
-			"Error while running `%s ..`: %s", ctx.EvalCmd, err.Error(),
+			"Error while running `%s ..`: %s", nixOptions.EvalCmd, err.Error(),
 		)
 		return buildShell, errors.New(errorMessage)
 	}
@@ -322,14 +292,16 @@ func GetBuildShell(ctx *common.NixContext, deploymentPath string) (buildShell *s
 	return buildShell, nil
 }
 
-func EvalHosts(ctx *common.NixContext, deploymentPath string, attr string) (string, error) {
+func EvalHosts(opts *common.MorphOptions, deploymentPath string, attr string) (string, error) {
+	nixOptions := opts.NixOptions()
+
 	attribute := "nodes." + attr
 
 	nixEvalInvocationArgs := NixEvalInvocationArgs{
 		AsJSON:         false,
 		Attr:           attribute,
 		DeploymentPath: deploymentPath,
-		NixContext:     *ctx,
+		NixOptions:     *nixOptions,
 		Strict:         true,
 	}
 
@@ -338,7 +310,7 @@ func EvalHosts(ctx *common.NixContext, deploymentPath string, attr string) (stri
 		return "", err
 	}
 
-	cmd := exec.Command(ctx.EvalCmd, nixEvalInvocationArgs.ToNixInstantiateArgs()...)
+	cmd := exec.Command(nixOptions.EvalCmd, nixEvalInvocationArgs.ToNixInstantiateArgs()...)
 
 	utils.AddFinalizer(func() {
 		if (cmd.ProcessState == nil || !cmd.ProcessState.Exited()) && cmd.Process != nil {
@@ -354,13 +326,13 @@ func EvalHosts(ctx *common.NixContext, deploymentPath string, attr string) (stri
 	return deploymentPath, err
 }
 
-func GetMachines(ctx *common.NixContext, deploymentPath string) (deployment Deployment, err error) {
+func GetMachines(nixOptions *common.NixOptions, deploymentPath string) (deployment Deployment, err error) {
 
 	nixEvalInvocationArgs := NixEvalInvocationArgs{
 		AsJSON:         true,
 		Attr:           "info.deployment",
 		DeploymentPath: deploymentPath,
-		NixContext:     *ctx,
+		NixOptions:     *nixOptions,
 		Strict:         true,
 	}
 
@@ -369,7 +341,7 @@ func GetMachines(ctx *common.NixContext, deploymentPath string) (deployment Depl
 		return deployment, err
 	}
 
-	cmd := exec.Command(ctx.EvalCmd, nixEvalInvocationArgs.ToNixInstantiateArgs()...)
+	cmd := exec.Command(nixOptions.EvalCmd, nixEvalInvocationArgs.ToNixInstantiateArgs()...)
 
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout // FIXME: zlog this while still capturing stdout
@@ -385,7 +357,7 @@ func GetMachines(ctx *common.NixContext, deploymentPath string) (deployment Depl
 	err = cmd.Run()
 	if err != nil {
 		errorMessage := fmt.Sprintf(
-			"Error while running `%s ..`: %s", ctx.EvalCmd, err.Error(),
+			"Error while running `%s ..`: %s", nixOptions.EvalCmd, err.Error(),
 		)
 		return deployment, errors.New(errorMessage)
 	}
@@ -398,7 +370,9 @@ func GetMachines(ctx *common.NixContext, deploymentPath string) (deployment Depl
 	return deployment, nil
 }
 
-func BuildMachines(ctx *common.NixContext, deploymentPath string, hosts []Host, nixArgs []string, nixBuildTargets string) (resultPath string, err error) {
+func BuildMachines(opts *common.MorphOptions, deploymentPath string, hosts []Host, nixArgs []string, nixBuildTargets string) (resultPath string, err error) {
+	nixOptions := opts.NixOptions()
+
 	tmpdir, err := ioutil.TempDir("", "morph-")
 	if err != nil {
 		return "", err
@@ -413,18 +387,18 @@ func BuildMachines(ctx *common.NixContext, deploymentPath string, hosts []Host, 
 	}
 
 	resultLinkPath := filepath.Join(path.Dir(deploymentPath), ".gcroots", path.Base(deploymentPath))
-	if ctx.KeepGCRoot {
+	if nixOptions.KeepGCRoot {
 		if err = os.MkdirAll(path.Dir(resultLinkPath), 0755); err != nil {
-			ctx.KeepGCRoot = false
+			nixOptions.KeepGCRoot = false
 			fmt.Fprintf(os.Stderr, "Unable to create GC root, skipping: %s", err)
 		}
 	}
-	if !ctx.KeepGCRoot {
+	if !nixOptions.KeepGCRoot {
 		// create tmp dir for result link
 		resultLinkPath = filepath.Join(tmpdir, "result")
 	}
 
-	buildShell, err := GetBuildShell(ctx, deploymentPath)
+	buildShell, err := GetBuildShell(nixOptions, deploymentPath)
 
 	if err != nil {
 		errorMessage := fmt.Sprintf(
@@ -442,7 +416,7 @@ func BuildMachines(ctx *common.NixContext, deploymentPath string, hosts []Host, 
 		NixArgs:         nixArgs,
 		NixBuildTargets: nixBuildTargets,
 		NixConfig:       hosts[0].NixConfig,
-		NixContext:      *ctx,
+		NixOptions:      *nixOptions,
 		ResultLinkPath:  resultLinkPath,
 	}
 
@@ -457,11 +431,11 @@ func BuildMachines(ctx *common.NixContext, deploymentPath string, hosts []Host, 
 	}
 
 	var cmd *exec.Cmd
-	if ctx.AllowBuildShell && buildShell != nil {
-		shellArgs := strings.Join(append([]string{ctx.BuildCmd}, NixBuildInvocationArgs.ToNixBuildArgs()...), " ")
-		cmd = exec.Command(ctx.ShellCmd, *buildShell, "--pure", "--run", shellArgs)
+	if nixOptions.AllowBuildShell && buildShell != nil {
+		shellArgs := strings.Join(append([]string{nixOptions.BuildCmd}, NixBuildInvocationArgs.ToNixBuildArgs()...), " ")
+		cmd = exec.Command(nixOptions.ShellCmd, *buildShell, "--pure", "--run", shellArgs)
 	} else {
-		cmd = exec.Command(ctx.BuildCmd, NixBuildInvocationArgs.ToNixBuildArgs()...)
+		cmd = exec.Command(nixOptions.BuildCmd, NixBuildInvocationArgs.ToNixBuildArgs()...)
 	}
 
 	utils.AddFinalizer(func() {

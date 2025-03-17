@@ -4,6 +4,7 @@ import (
 	"github.com/DBCDK/morph/utils"
 	"github.com/rs/zerolog/log"
 	"os"
+	"path/filepath"
 )
 
 type MorphOptions struct {
@@ -45,7 +46,7 @@ type MorphOptions struct {
 	Timeout             int
 }
 
-type NixContext struct {
+type NixOptions struct {
 	EvalCmd         string
 	BuildCmd        string
 	ShellCmd        string
@@ -65,6 +66,36 @@ type SshOptions struct {
 	SkipHostKeyCheck       bool
 }
 
+func (o *MorphOptions) NixOptions() *NixOptions {
+	evalCmd := os.Getenv("MORPH_NIX_EVAL_CMD")
+	buildCmd := os.Getenv("MORPH_NIX_BUILD_CMD")
+	shellCmd := os.Getenv("MORPH_NIX_SHELL_CMD")
+	evalMachines := os.Getenv("MORPH_NIX_EVAL_MACHINES")
+
+	if evalCmd == "" {
+		evalCmd = "nix-instantiate"
+	}
+	if buildCmd == "" {
+		buildCmd = "nix-build"
+	}
+	if shellCmd == "" {
+		shellCmd = "nix-shell"
+	}
+	if evalMachines == "" {
+		evalMachines = filepath.Join(o.AssetRoot, "eval-machines.nix")
+	}
+
+	return &NixOptions{
+		EvalCmd:         evalCmd,
+		BuildCmd:        buildCmd,
+		ShellCmd:        shellCmd,
+		EvalMachines:    evalMachines,
+		ShowTrace:       o.ShowTrace,
+		KeepGCRoot:      *o.KeepGCRoot,
+		AllowBuildShell: *o.AllowBuildShell,
+	}
+}
+
 func (o *MorphOptions) SshOptions() *SshOptions {
 	return &SshOptions{
 		AskForSudoPassword:     o.AskForSudoPasswd,
@@ -74,11 +105,6 @@ func (o *MorphOptions) SshOptions() *SshOptions {
 		SkipHostKeyCheck:       os.Getenv("SSH_SKIP_HOST_KEY_CHECK") != "",
 		ConfigFile:             os.Getenv("SSH_CONFIG_FILE"),
 	}
-}
-
-type MorphContext struct {
-	Options    *MorphOptions
-	NixContext *NixContext
 }
 
 func HandleError(err error) {

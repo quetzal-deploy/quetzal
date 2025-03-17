@@ -97,44 +97,44 @@ func (action *DeployTest) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, &action)
 }
 
-func (action DeployBoot) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action DeployBoot) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
 	}
 
-	return deploy(ctx, mctx, cache_, host, "boot")
+	return deploy(ctx, opts, cache_, host, "boot")
 }
 
-func (action DeployDryActivate) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action DeployDryActivate) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
 	}
 
-	return deploy(ctx, mctx, cache_, host, "dry-activate")
+	return deploy(ctx, opts, cache_, host, "dry-activate")
 }
 
-func (action DeploySwitch) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action DeploySwitch) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
 	}
 
-	return deploy(ctx, mctx, cache_, host, "switch")
+	return deploy(ctx, opts, cache_, host, "switch")
 }
 
-func (action DeployTest) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action DeployTest) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
 	}
 
-	return deploy(ctx, mctx, cache_, host, "test")
+	return deploy(ctx, opts, cache_, host, "test")
 }
 
-func deploy(ctx context.Context, mctx *common.MorphContext, cache_ *cache.LockedMap[string], host nix.Host, deployAction string) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func deploy(ctx context.Context, opts *common.MorphOptions, cache_ *cache.LockedMap[string], host nix.Host, deployAction string) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	log.Info().Msg(fmt.Sprintf("Executing %s on %s", deployAction, host.Name))
 

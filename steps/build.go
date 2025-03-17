@@ -51,7 +51,7 @@ func filterHosts(needles []string, allHosts map[string]nix.Host) ([]nix.Host, er
 	return result, nil
 }
 
-func (build *Build) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (build *Build) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	hosts, err := filterHosts(build.Hosts, allHosts)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (build *Build) Run(ctx context.Context, mctx *common.MorphContext, allHosts
 
 	// FIXME: Build errors does not bubble up correctly (try setting `services.haproxy.enable = true;`, it'll cause the build to fall and morph to hang
 
-	resultPath, err := cruft.ExecBuild(mctx, hosts)
+	resultPath, err := cruft.ExecBuild(opts, hosts)
 	if err != nil {
 		return err
 	}

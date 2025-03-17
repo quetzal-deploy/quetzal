@@ -101,15 +101,10 @@ func main() {
 	defer utils.RunFinalizers()
 	setup()
 
-	mctx := &common.MorphContext{
-		Options:    opts,
-		NixContext: nix.GetNixContext(assetRoot, opts.ShowTrace, *opts.KeepGCRoot, *opts.AllowBuildShell),
-	}
-
 	// evaluate without building hosts
 	switch clause {
 	case cmdClauses.Eval.FullCommand():
-		_, err := cruft.ExecEval(mctx)
+		_, err := cruft.ExecEval(opts)
 		common.HandleError(err)
 		return
 	}
@@ -117,7 +112,7 @@ func main() {
 	switch clause {
 
 	case cmdClauses.Daemon.FullCommand():
-		events.ServeHttp(mctx, 8123, eventManager, opts.DeploymentsDir)
+		events.ServeHttp(opts, 8123, eventManager, opts.DeploymentsDir)
 		return
 
 	case cmdClauses.PlanRun.FullCommand():
@@ -136,7 +131,7 @@ func main() {
 		// setup hosts
 		// FIXME: Should this be its own step instead?
 		// But then what about the generated plan? It can no longer contain the lists of hosts, but only the deployment and filters users, which will make resume difficult..
-		deploymentMetadata, hosts, err := cruft.GetHosts(mctx, opts.Deployment)
+		deploymentMetadata, hosts, err := cruft.GetHosts(opts)
 		common.HandleError(err)
 
 		hostsMap := make(map[string]nix.Host)
@@ -231,7 +226,7 @@ func main() {
 			os.Exit(17)
 		}
 
-		megaContext := planner.NewMegaContext(eventManager, hostsMap, mctx, constraints)
+		megaContext := planner.NewMegaContext(eventManager, hostsMap, opts, constraints)
 
 		go planner.StepMonitor(megaContext.Steps, megaContext.StepStatus)
 

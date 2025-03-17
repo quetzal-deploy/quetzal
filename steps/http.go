@@ -61,10 +61,10 @@ func (action *RemoteRequest) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, action)
 }
 
-func (action LocalRequest) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action LocalRequest) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return errors.New("not implemented: " + action.Name())
 }
 
-func (action RemoteRequest) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action RemoteRequest) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return errors.New("not implemented: " + action.Name())
 }

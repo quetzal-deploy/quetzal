@@ -17,23 +17,23 @@ import (
 	"github.com/DBCDK/morph/utils"
 )
 
-func ExecBuild(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
-	resultPath, err := buildHosts(mctx, hosts)
+func ExecBuild(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
+	resultPath, err := buildHosts(opts, hosts)
 	if err != nil {
 		return "", err
 	}
 	return resultPath, nil
 }
 
-func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func ExecDeploy(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	doPush := false
 	doUploadSecrets := false
 	doActivate := false
 
-	if !*mctx.Options.DryRun {
-		switch mctx.Options.DeploySwitchAction {
+	if !*opts.DryRun {
+		switch opts.DeploySwitchAction {
 		case "dry-activate":
 			doPush = true
 			doActivate = true
@@ -43,12 +43,12 @@ func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 			fallthrough
 		case "boot":
 			doPush = true
-			doUploadSecrets = mctx.Options.DeployUploadSecrets
+			doUploadSecrets = opts.DeployUploadSecrets
 			doActivate = true
 		}
 	}
 
-	resultPath, err := buildHosts(mctx, hosts)
+	resultPath, err := buildHosts(opts, hosts)
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +73,7 @@ func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 
 		if doUploadSecrets {
 			phase := "pre-activation"
-			err = ExecUploadSecrets(mctx, singleHostInList, &phase)
+			err = ExecUploadSecrets(opts, singleHostInList, &phase)
 			if err != nil {
 				return "", err
 			}
@@ -81,8 +81,8 @@ func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 			fmt.Fprintln(os.Stderr)
 		}
 
-		if !mctx.Options.SkipPreDeployChecks {
-			err := healthchecks.PerformPreDeployChecks(sshCtx, &host, mctx.Options.Timeout)
+		if !opts.SkipPreDeployChecks {
+			err := healthchecks.PerformPreDeployChecks(sshCtx, &host, opts.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host pre-deploy check failed.")
@@ -91,13 +91,13 @@ func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 		}
 
 		if doActivate {
-			err = activateConfiguration(mctx, singleHostInList, resultPath)
+			err = activateConfiguration(opts, singleHostInList, resultPath)
 			if err != nil {
 				return "", err
 			}
 		}
 
-		if mctx.Options.DeployReboot {
+		if opts.DeployReboot {
 			err = host.Reboot(sshCtx)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Reboot failed")
@@ -107,7 +107,7 @@ func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 
 		if doUploadSecrets {
 			phase := "post-activation"
-			err = ExecUploadSecrets(mctx, singleHostInList, &phase)
+			err = ExecUploadSecrets(opts, singleHostInList, &phase)
 			if err != nil {
 				return "", err
 			}
@@ -115,8 +115,8 @@ func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 			fmt.Fprintln(os.Stderr)
 		}
 
-		if !mctx.Options.SkipHealthChecks {
-			err := healthchecks.PerformHealthChecks(sshCtx, &host, mctx.Options.Timeout)
+		if !opts.SkipHealthChecks {
+			err := healthchecks.PerformHealthChecks(sshCtx, &host, opts.Timeout)
 			if err != nil {
 				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "Not deploying to additional hosts, since a host health check failed.")
@@ -130,20 +130,20 @@ func ExecDeploy(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 	return resultPath, nil
 }
 
-func ExecEval(mctx *common.MorphContext) (string, error) {
-	deploymentFile, err := os.Open(mctx.Options.Deployment)
+func ExecEval(opts *common.MorphOptions) (string, error) {
+	deploymentFile, err := os.Open(opts.Deployment)
 	deploymentPath, err := filepath.Abs(deploymentFile.Name())
 	if err != nil {
 		return "", err
 	}
 
-	path, err := nix.EvalHosts(mctx.NixContext, deploymentPath, mctx.Options.AttrKey)
+	path, err := nix.EvalHosts(opts, deploymentPath, opts.AttrKey)
 
 	return path, err
 }
 
-func ExecExecute(mctx *common.MorphContext, hosts []nix.Host) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func ExecExecute(opts *common.MorphOptions, hosts []nix.Host) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	for _, host := range hosts {
 		if host.BuildOnly {
@@ -151,15 +151,15 @@ func ExecExecute(mctx *common.MorphContext, hosts []nix.Host) error {
 			continue
 		}
 		fmt.Fprintln(os.Stderr, "** "+host.Name)
-		sshCtx.CmdInteractive(&host, mctx.Options.Timeout, mctx.Options.ExecuteCommand...)
+		sshCtx.CmdInteractive(&host, opts.Timeout, opts.ExecuteCommand...)
 		fmt.Fprintln(os.Stderr)
 	}
 
 	return nil
 }
 
-func ExecHealthCheck(mctx *common.MorphContext, hosts []nix.Host) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func ExecHealthCheck(opts *common.MorphOptions, hosts []nix.Host) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	var err error
 	for _, host := range hosts {
@@ -167,7 +167,7 @@ func ExecHealthCheck(mctx *common.MorphContext, hosts []nix.Host) error {
 			fmt.Fprintf(os.Stderr, "Healthchecks are disabled for build-only host: %s\n", host.Name)
 			continue
 		}
-		err = healthchecks.PerformHealthChecks(sshCtx, &host, mctx.Options.Timeout)
+		err = healthchecks.PerformHealthChecks(sshCtx, &host, opts.Timeout)
 	}
 
 	if err != nil {
@@ -177,10 +177,10 @@ func ExecHealthCheck(mctx *common.MorphContext, hosts []nix.Host) error {
 	return err
 }
 
-func ExecPush(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func ExecPush(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
-	resultPath, err := ExecBuild(mctx, hosts)
+	resultPath, err := ExecBuild(opts, hosts)
 	if err != nil {
 		return "", err
 	}
@@ -189,9 +189,9 @@ func ExecPush(mctx *common.MorphContext, hosts []nix.Host) (string, error) {
 	return resultPath, pushPaths(sshCtx, hosts, resultPath)
 }
 
-func GetHosts(mctx *common.MorphContext, deploymentPath string) (deploymentMetadata nix.DeploymentMetadata, hosts []nix.Host, err error) {
+func GetHosts(opts *common.MorphOptions) (deploymentMetadata nix.DeploymentMetadata, hosts []nix.Host, err error) {
 
-	deploymentFile, err := os.Open(deploymentPath)
+	deploymentFile, err := os.Open(opts.Deployment)
 	if err != nil {
 		return deploymentMetadata, hosts, err
 	}
@@ -201,31 +201,31 @@ func GetHosts(mctx *common.MorphContext, deploymentPath string) (deploymentMetad
 		return deploymentMetadata, hosts, err
 	}
 
-	deployment, err := nix.GetMachines(mctx.NixContext, deploymentAbsPath)
+	deployment, err := nix.GetMachines(opts.NixOptions(), deploymentAbsPath)
 	if err != nil {
 		return deploymentMetadata, hosts, err
 	}
 
-	matchingHosts, err := filter.MatchHosts(deployment.Hosts, mctx.Options.SelectGlob)
+	matchingHosts, err := filter.MatchHosts(deployment.Hosts, opts.SelectGlob)
 	if err != nil {
 		return deploymentMetadata, hosts, err
 	}
 
 	var selectedTags []string
-	if mctx.Options.SelectTags != "" {
-		selectedTags = strings.Split(mctx.Options.SelectTags, ",")
+	if opts.SelectTags != "" {
+		selectedTags = strings.Split(opts.SelectTags, ",")
 	}
 
 	matchingHosts2 := filter.FilterHostsTags(matchingHosts, selectedTags)
 
 	ordering := deployment.Meta.Ordering
-	if mctx.Options.OrderingTags != "" {
-		ordering = nix.HostOrdering{Tags: strings.Split(mctx.Options.OrderingTags, ",")}
+	if opts.OrderingTags != "" {
+		ordering = nix.HostOrdering{Tags: strings.Split(opts.OrderingTags, ",")}
 	}
 
 	sortedHosts := filter.SortHosts(matchingHosts2, ordering)
 
-	filteredHosts := filter.FilterHosts(sortedHosts, mctx.Options.SelectSkip, mctx.Options.SelectEvery, mctx.Options.SelectLimit)
+	filteredHosts := filter.FilterHosts(sortedHosts, opts.SelectSkip, opts.SelectEvery, opts.SelectLimit)
 
 	zLogHostsDict := zerolog.Dict()
 	for _, host := range filteredHosts {
@@ -251,10 +251,10 @@ func GetHosts(mctx *common.MorphContext, deploymentPath string) (deploymentMetad
 	return deployment.Meta, filteredHosts, nil
 }
 
-func activateConfiguration(mctx *common.MorphContext, filteredHosts []nix.Host, resultPath string) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func activateConfiguration(opts *common.MorphOptions, filteredHosts []nix.Host, resultPath string) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
-	fmt.Fprintln(os.Stderr, "Executing '"+mctx.Options.DeploySwitchAction+"' on matched hosts:")
+	fmt.Fprintln(os.Stderr, "Executing '"+opts.DeploySwitchAction+"' on matched hosts:")
 	fmt.Fprintln(os.Stderr)
 	for _, host := range filteredHosts {
 
@@ -265,7 +265,7 @@ func activateConfiguration(mctx *common.MorphContext, filteredHosts []nix.Host, 
 			return err
 		}
 
-		err = sshCtx.ActivateConfiguration(&host, configuration, mctx.Options.DeploySwitchAction)
+		err = sshCtx.ActivateConfiguration(&host, configuration, opts.DeploySwitchAction)
 		if err != nil {
 			return err
 		}
@@ -276,27 +276,27 @@ func activateConfiguration(mctx *common.MorphContext, filteredHosts []nix.Host, 
 	return nil
 }
 
-func buildHosts(mctx *common.MorphContext, hosts []nix.Host) (resultPath string, err error) {
+func buildHosts(opts *common.MorphOptions, hosts []nix.Host) (resultPath string, err error) {
 	if len(hosts) == 0 {
 		err = errors.New("No hosts selected")
 		return
 	}
 
-	deploymentPath, err := filepath.Abs(mctx.Options.Deployment)
+	deploymentPath, err := filepath.Abs(opts.Deployment)
 	if err != nil {
 		return
 	}
 
 	nixBuildTargets := ""
-	if mctx.Options.NixBuildTargetFile != "" {
-		if path, err := filepath.Abs(mctx.Options.NixBuildTargetFile); err == nil {
+	if opts.NixBuildTargetFile != "" {
+		if path, err := filepath.Abs(opts.NixBuildTargetFile); err == nil {
 			nixBuildTargets = fmt.Sprintf("import \"%s\"", path)
 		}
-	} else if mctx.Options.NixBuildTarget != "" {
-		nixBuildTargets = fmt.Sprintf("{ \"out\" = %s; }", mctx.Options.NixBuildTarget)
+	} else if opts.NixBuildTarget != "" {
+		nixBuildTargets = fmt.Sprintf("{ \"out\" = %s; }", opts.NixBuildTarget)
 	}
 
-	resultPath, err = nix.BuildMachines(mctx.NixContext, deploymentPath, hosts, mctx.Options.NixBuildArg, nixBuildTargets)
+	resultPath, err = nix.BuildMachines(opts, deploymentPath, hosts, opts.NixBuildArg, nixBuildTargets)
 
 	if err != nil {
 		return

@@ -51,8 +51,8 @@ func (action *Reboot) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, action)
 }
 
-func (action IsOnline) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func (action IsOnline) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	host, ok := allHosts[action.Host]
 	if !ok {
@@ -70,8 +70,8 @@ func (action IsOnline) Run(ctx context.Context, mctx *common.MorphContext, allHo
 
 	return err
 }
-func (action Reboot) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
-	sshCtx := ssh.CreateSSHContext(mctx.Options.SshOptions())
+func (action Reboot) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+	sshCtx := ssh.CreateSSHContext(opts.SshOptions())
 
 	host, exists := allHosts[action.Host]
 	if !exists {

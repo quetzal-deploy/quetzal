@@ -27,6 +27,6 @@ func (action *GetSudoPasswd) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, action)
 }
 
-func (step GetSudoPasswd) Run(ctx context.Context, mctx *common.MorphContext, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (step GetSudoPasswd) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return errors.New("not implemented: " + step.Name())
 }

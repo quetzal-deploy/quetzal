@@ -23,7 +23,7 @@ type Deployment struct {
 	Color       string     `json:"color"`
 }
 
-func ServeHttp(mctx *common.MorphContext, port int, manager *Manager, deploymentsPath string) {
+func ServeHttp(opts *common.MorphOptions, port int, manager *Manager, deploymentsPath string) {
 	dirEntries, err := os.ReadDir(deploymentsPath)
 	if err != nil {
 		panic(1)
@@ -41,7 +41,7 @@ func ServeHttp(mctx *common.MorphContext, port int, manager *Manager, deployment
 		if strings.HasSuffix(f.Name(), suffix) {
 			path := path.Join(deploymentsPath, f.Name())
 
-			meta, hosts, err := cruft.GetHosts(mctx, path)
+			meta, hosts, err := cruft.GetHosts(opts)
 
 			if err != nil {
 				panic(err.Error())
