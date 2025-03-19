@@ -1,9 +1,10 @@
 package cliparser
 
 import (
+	"strings"
+
 	"github.com/DBCDK/kingpin"
 	"github.com/DBCDK/morph/common"
-	"strings"
 )
 
 var planActions = []string{"run", "resume"}

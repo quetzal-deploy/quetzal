@@ -3,12 +3,13 @@ package logging
 import (
 	"cmp"
 	"fmt"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"maps"
 	"os/exec"
 	"slices"
 	"strings"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type CmdWriter struct {

@@ -2,18 +2,19 @@ package ui
 
 import (
 	"fmt"
-	"github.com/DBCDK/morph/events"
-	"github.com/DBCDK/morph/planner"
-	"github.com/DBCDK/morph/steps"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/tree"
 	"maps"
 	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/tree"
+
+	"github.com/DBCDK/morph/events"
+	"github.com/DBCDK/morph/planner"
+	"github.com/DBCDK/morph/steps"
 )
 
 var (

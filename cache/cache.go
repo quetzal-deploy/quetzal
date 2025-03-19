@@ -3,8 +3,9 @@ package cache
 import (
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type StepData struct {

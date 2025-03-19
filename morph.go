@@ -11,6 +11,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/DBCDK/kingpin"
 	"github.com/DBCDK/morph/cliparser"
 	"github.com/DBCDK/morph/common"
@@ -21,11 +28,6 @@ import (
 	"github.com/DBCDK/morph/steps"
 	"github.com/DBCDK/morph/ui"
 	"github.com/DBCDK/morph/utils"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"os"
-	"strconv"
-	"strings"
 )
 
 // These are set at build time via -ldflags magic

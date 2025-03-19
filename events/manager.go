@@ -1,8 +1,9 @@
 package events
 
 import (
-	"github.com/google/uuid"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 type EventWithId struct {

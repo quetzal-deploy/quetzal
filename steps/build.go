@@ -5,13 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
+	"path/filepath"
+
+	"github.com/rs/zerolog/log"
+
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/cruft"
 	"github.com/DBCDK/morph/nix"
-	"github.com/rs/zerolog/log"
-	"path"
-	"path/filepath"
 )
 
 type Build struct {

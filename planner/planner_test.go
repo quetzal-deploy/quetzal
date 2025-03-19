@@ -1,11 +1,12 @@
 package planner
 
 import (
+	"slices"
+	"testing"
+
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/events"
 	"github.com/DBCDK/morph/nix"
-	"slices"
-	"testing"
 )
 
 func TestSolverGetNumeralId(t *testing.T) {

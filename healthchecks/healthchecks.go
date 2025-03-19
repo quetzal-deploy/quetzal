@@ -3,10 +3,11 @@ package healthchecks
 import (
 	"errors"
 	"fmt"
-	"github.com/DBCDK/morph/ssh"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/DBCDK/morph/ssh"
 )
 
 func PerformChecks(sshContext *ssh.SSHContext, checkName string, host Host, healthChecks HealthChecks, timeout int) (err error) {

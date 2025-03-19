@@ -1,10 +1,12 @@
 package common
 
 import (
-	"github.com/DBCDK/morph/utils"
-	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
+
+	"github.com/rs/zerolog/log"
+
+	"github.com/DBCDK/morph/utils"
 )
 
 type MorphOptions struct {

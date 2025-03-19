@@ -3,14 +3,16 @@ package events
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/cruft"
-	"github.com/DBCDK/morph/nix"
-	"github.com/labstack/echo/v4"
 	"net/http"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/labstack/echo/v4"
+
+	"github.com/DBCDK/morph/common"
+	"github.com/DBCDK/morph/cruft"
+	"github.com/DBCDK/morph/nix"
 )
 
 var ()

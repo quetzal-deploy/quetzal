@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/logging"
-	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -17,7 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
+	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/healthchecks"
+	"github.com/DBCDK/morph/logging"
 	"github.com/DBCDK/morph/secrets"
 	"github.com/DBCDK/morph/ssh"
 	"github.com/DBCDK/morph/utils"

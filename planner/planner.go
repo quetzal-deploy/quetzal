@@ -3,20 +3,22 @@ package planner
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/crillab/gophersat/solver"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/events"
 	"github.com/DBCDK/morph/logging"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/steps"
-	"github.com/crillab/gophersat/solver"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"maps"
-	"slices"
-	"sort"
-	"sync"
-	"time"
 )
 
 const (

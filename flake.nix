@@ -74,6 +74,8 @@
         devShells.default = pkgs.mkShell {
           inherit (self.checks.${system}.pre-commit-check) shellHook;
           inputsFrom = [ self.packages.${system}.morph ];
+
+          packages = with pkgs; [ gotools ];
         };
 
         packages = rec {

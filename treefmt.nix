@@ -18,6 +18,16 @@
         "*.nix"
         "./data/*"
       ];
+      goimports = {
+        command = "goimports";
+        includes = [ "*.go" ];
+        excludes = [ "vendor/*" ];
+        options = [
+          "-w"
+          "-local"
+          "github.com/DBCDK"
+        ];
+      };
     };
   };
 }

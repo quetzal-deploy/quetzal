@@ -3,9 +3,11 @@ package planner
 import (
 	"bufio"
 	"fmt"
+
+	"github.com/google/uuid"
+
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/steps"
-	"github.com/google/uuid"
 )
 
 type XSchedule struct {

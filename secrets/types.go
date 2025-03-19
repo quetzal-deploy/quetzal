@@ -1,7 +1,9 @@
 package secrets
 
-import "fmt"
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 type Secret struct {
 	Source      string
