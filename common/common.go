@@ -3,6 +3,7 @@ package common
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 
@@ -99,12 +100,15 @@ func (o *MorphOptions) NixOptions() *NixOptions {
 }
 
 func (o *MorphOptions) SshOptions() *SshOptions {
+	skipHostKeyEnv := strings.ToLower(os.Getenv("SSH_SKIP_HOST_KEY_CHECK"))
+	skipHostKeyCheck := skipHostKeyEnv == "yes" || skipHostKeyEnv == "true"
+
 	return &SshOptions{
 		AskForSudoPassword:     o.AskForSudoPasswd,
 		GetSudoPasswordCommand: o.PassCmd,
 		IdentityFile:           os.Getenv("SSH_IDENTITY_FILE"),
 		DefaultUsername:        os.Getenv("SSH_USER"),
-		SkipHostKeyCheck:       os.Getenv("SSH_SKIP_HOST_KEY_CHECK") != "",
+		SkipHostKeyCheck:       skipHostKeyCheck,
 		ConfigFile:             os.Getenv("SSH_CONFIG_FILE"),
 	}
 }
