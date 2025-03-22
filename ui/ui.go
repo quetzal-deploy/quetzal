@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -31,13 +32,13 @@ var (
 		return titleStyle.BorderStyle(b)
 	}()
 
-	inactiveTabBorder = tabBorderWithBottom("┴", "─", "┴")
-	activeTabBorder   = tabBorderWithBottom("┘", " ", "└")
-	docStyle          = lipgloss.NewStyle().Padding(0, 0, 0, 0)
-	highlightColor    = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	inactiveTabStyle  = lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(highlightColor).Padding(0, 1)
-	activeTabStyle    = inactiveTabStyle.Border(activeTabBorder, true)
-	windowStyle       = lipgloss.NewStyle().BorderForeground(highlightColor).Padding(0, 0).Align(lipgloss.Left).Border(lipgloss.NormalBorder()).UnsetBorderTop()
+	docStyle              = lipgloss.NewStyle().Padding(0, 0, 0, 0)
+	highlightColor        = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	windowStyle           = lipgloss.NewStyle().BorderForeground(highlightColor).Padding(0, 0).Align(lipgloss.Left).Border(lipgloss.NormalBorder()).UnsetBorderTop()
+	menuAccentColor       = lipgloss.AdaptiveColor{Light: "#FF0000", Dark: "#FF0000"}
+	menuBorderStyle       = lipgloss.NewStyle().PaddingBottom(1).PaddingLeft(1).PaddingRight(1)
+	inactiveMenuItemStyle = lipgloss.NewStyle().Bold(true)
+	activeMenuItemStyle   = inactiveMenuItemStyle.Foreground(menuAccentColor)
 
 	stepStyleWaiting   = lipgloss.NewStyle()
 	stepStyleScheduled = lipgloss.NewStyle().Background(lipgloss.Color("#666666"))
@@ -55,12 +56,9 @@ var (
 	}
 )
 
-func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
-	border := lipgloss.NormalBorder()
-	border.BottomLeft = left
-	border.Bottom = middle
-	border.BottomRight = right
-	return border
+type MenuItem struct {
+	name    string
+	keybind string
 }
 
 type model struct {
@@ -80,13 +78,24 @@ type model struct {
 	queue      []events.StepStatus
 	steps      map[string]steps.Step
 
-	Tabs       []string
+	Tabs       []MenuItem
 	TabContent []string
 	activeTab  int
+
+	tabKeyBinds map[string]int
 }
 
 func (m model) Init() tea.Cmd {
 	return nil
+}
+
+func (m model) ChangeTab(tabIndex int) (tea.Model, tea.Cmd) {
+	if m.activeTab != tabIndex {
+		m.activeTab = tabIndex
+		m.viewport.SetContent(m.TabContent[m.activeTab])
+	}
+
+	return m, nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -105,16 +114,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "down":
 
-		case "left", "tab":
-			m.activeTab = max(m.activeTab-1, 0)
-			m.viewport.SetContent(m.TabContent[m.activeTab])
-			return m, nil
+		case "left", "shift+tab":
+			tabIndex := max(m.activeTab-1, 0)
+			return m.ChangeTab(tabIndex)
 
-		case "right", "shift-tab":
-			m.activeTab = min(m.activeTab+1, len(m.Tabs)-1)
-			m.viewport.SetContent(m.TabContent[m.activeTab])
-			return m, nil
+		case "right", "tab":
+			tabIndex := min(m.activeTab+1, len(m.Tabs)-1)
+			return m.ChangeTab(tabIndex)
 
+		default:
+			// try matching on default tabKeyBinds
+			if tabIndex, ok := m.tabKeyBinds[msg.String()]; ok {
+				return m.ChangeTab(tabIndex)
+			}
+
+			// try matching numbers to tabIndex
+			if number, err := strconv.Atoi(msg.String()); err == nil {
+				tabIndex := number - 1
+				if 0 <= tabIndex && tabIndex < len(m.Tabs) {
+					return m.ChangeTab(tabIndex)
+				}
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -182,27 +202,14 @@ func (m model) View() string {
 	for i, tab := range m.Tabs {
 		var style lipgloss.Style
 
-		isFirst, isLast, isActive := i == 0, i == len(m.Tabs)-1, i == m.activeTab
+		isActive := i == m.activeTab
 		if isActive {
-			style = activeTabStyle
+			style = activeMenuItemStyle
 		} else {
-			style = inactiveTabStyle
+			style = inactiveMenuItemStyle
 		}
 
-		border, _, _, _, _ := style.GetBorder()
-
-		if isFirst && isActive {
-			border.BottomLeft = "│"
-		} else if isFirst && !isActive {
-			border.BottomLeft = "├"
-		} else if isLast && isActive {
-			border.BottomRight = "│"
-		} else if isLast && !isActive {
-			border.BottomRight = "┤"
-		}
-
-		style = style.Border(border)
-		tabBar = append(tabBar, style.Render(tab))
+		tabBar = append(tabBar, menuBorderStyle.Render(tab.RenderWithBaseStyle(style)))
 	}
 
 	switch m.activeTab {
@@ -236,8 +243,15 @@ func (m model) View() string {
 
 	m.viewport.SetContent(m.viewportContent)
 
-	row := lipgloss.JoinHorizontal(lipgloss.Top, tabBar...)
-	doc.WriteString(row)
+	tabsView := lipgloss.JoinHorizontal(lipgloss.Top, tabBar...)
+
+	menuView := m.menuView()
+
+	line := strings.Repeat(" ", max(0, m.viewport.Width-lipgloss.Width(tabsView)-lipgloss.Width(menuView)))
+
+	header := lipgloss.JoinHorizontal(lipgloss.Center, tabsView, line, menuView)
+
+	doc.WriteString(header)
 	doc.WriteString("\n")
 	//doc.WriteString(windowStyle.Width((m.width - windowStyle.GetHorizontalFrameSize())).Render(m.TabContent[m.activeTab]))
 	doc.WriteString(m.viewport.View())
@@ -245,6 +259,27 @@ func (m model) View() string {
 	doc.WriteString(m.footerView())
 
 	return docStyle.Render(doc.String())
+}
+
+func (m model) menuView() string {
+	menuItems := []MenuItem{
+		{
+			name:    "pause",
+			keybind: "p",
+		},
+		{
+			name:    "quit",
+			keybind: "q",
+		},
+	}
+
+	menu := make([]string, 0)
+
+	for _, menuItem := range menuItems {
+		menu = append(menu, menuBorderStyle.Render(menuItem.RenderWithBaseStyle(inactiveMenuItemStyle)))
+	}
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, menu...)
 }
 
 func (m model) headerView() string {
@@ -257,6 +292,31 @@ func (m model) footerView() string {
 	info := infoStyle.Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100))
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
+}
+
+func (m MenuItem) Render() string {
+	return m.RenderWithBaseStyle(lipgloss.NewStyle())
+}
+
+func (m MenuItem) RenderWithBaseStyle(baseStyle lipgloss.Style) string {
+	r := strings.Builder{}
+
+	style := baseStyle.Foreground(menuAccentColor)
+
+	before, after, found := strings.Cut(m.name, m.keybind)
+
+	if found {
+		r.WriteString(baseStyle.Render(before))
+		r.WriteString(style.Render(m.keybind))
+		r.WriteString(baseStyle.Render(after))
+
+	} else {
+		r.WriteString(baseStyle.Render(m.name + " ("))
+		r.WriteString(style.Render(m.keybind))
+		r.WriteString(baseStyle.Render(")"))
+	}
+
+	return r.String()
 }
 
 func renderPlan(m model, step steps.Step) *tree.Tree {
@@ -408,12 +468,53 @@ func renderStepsInState(m model, state string) string {
 }
 
 func DoTea(eventChan chan events.EventWithId) *tea.Program {
+	tabs := []MenuItem{
+		{
+			name:    "plan",
+			keybind: "p",
+		},
+		{
+			name:    "logs",
+			keybind: "l",
+		},
+		{
+			name:    "running",
+			keybind: "r",
+		},
+		{
+			name:    "queue",
+			keybind: "u",
+		},
+		{
+			name:    "done",
+			keybind: "d",
+		},
+		{
+			name:    "failed",
+			keybind: "f",
+		},
+		{
+			name:    "all",
+			keybind: "a",
+		},
+	}
+
+	tabKeyBinds := make(map[string]int)
+	tabContent := make([]string, 0)
+
+	for tabIndex, menuItem := range tabs {
+		tabKeyBinds[menuItem.keybind] = tabIndex
+
+		tabContent = append(tabContent, "")
+	}
+
 	p := tea.NewProgram(
 		model{
 			viewportContent: "",
 			gotPlan:         false,
-			Tabs:            []string{"plan", "logs", "running", "queue", "done", "failed", "all"},
-			TabContent:      []string{"", "", "", "", "", "", ""},
+			Tabs:            tabs,
+			TabContent:      tabContent,
+			tabKeyBinds:     tabKeyBinds,
 			stepLog:         make(map[string]string),
 			stepStatus:      make(map[string]string),
 			steps:           make(map[string]steps.Step),
