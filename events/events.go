@@ -33,3 +33,8 @@ type StepStatus struct {
 type QueueStatus struct {
 	Queue []StepStatus
 }
+
+type Pause struct{}
+type Unpause struct{} // Maybe this should be called "Running" instead
+type StatePaused struct{}
+type StateUnpaused struct{} // Maybe this should be called "Running" instead

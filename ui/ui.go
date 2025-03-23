@@ -56,14 +56,9 @@ var (
 	}
 )
 
-type MenuItem struct {
-	name    string
-	keybind string
-}
-
 type model struct {
-	planner *planner.Planner
-	ready   bool
+	eventMgr *events.Manager
+	ready    bool
 
 	width  int
 	height int
@@ -78,11 +73,13 @@ type model struct {
 	queue      []events.StepStatus
 	steps      map[string]steps.Step
 
-	Tabs       []MenuItem
+	Tabs       []Button
 	TabContent []string
 	activeTab  int
 
 	tabKeyBinds map[string]int
+
+	paused bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -122,6 +119,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tabIndex := min(m.activeTab+1, len(m.Tabs)-1)
 			return m.ChangeTab(tabIndex)
 
+		case " ":
+			if m.paused {
+				m.eventMgr.SendEvent(events.Unpause{})
+			} else {
+				m.eventMgr.SendEvent(events.Pause{})
+			}
+
+			return m, nil
+
 		default:
 			// try matching on default tabKeyBinds
 			if tabIndex, ok := m.tabKeyBinds[msg.String()]; ok {
@@ -135,6 +141,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m.ChangeTab(tabIndex)
 				}
 			}
+
+			fmt.Println(msg.String())
 		}
 
 	case tea.WindowSizeMsg:
@@ -153,6 +161,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = msg.Height - verticalMarginHeight
 		}
+
+	case events.StatePaused:
+		m.paused = true
+
+	case events.StateUnpaused:
+		m.paused = false
 
 	case events.Log:
 		// FIXME: Scroll broken, both manual and automatic
@@ -209,7 +223,7 @@ func (m model) View() string {
 			style = inactiveMenuItemStyle
 		}
 
-		tabBar = append(tabBar, menuBorderStyle.Render(tab.RenderWithBaseStyle(style)))
+		tabBar = append(tabBar, menuBorderStyle.Render(tab.RenderWithBaseStyle(m, style)))
 	}
 
 	switch m.activeTab {
@@ -262,12 +276,9 @@ func (m model) View() string {
 }
 
 func (m model) menuView() string {
-	menuItems := []MenuItem{
-		{
-			name:    "pause",
-			keybind: "p",
-		},
-		{
+	menuItems := []Button{
+		PauseButton{keybind: " "},
+		MenuItem{
 			name:    "quit",
 			keybind: "q",
 		},
@@ -276,7 +287,7 @@ func (m model) menuView() string {
 	menu := make([]string, 0)
 
 	for _, menuItem := range menuItems {
-		menu = append(menu, menuBorderStyle.Render(menuItem.RenderWithBaseStyle(inactiveMenuItemStyle)))
+		menu = append(menu, menuBorderStyle.Render(menuItem.RenderWithBaseStyle(m, inactiveMenuItemStyle)))
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, menu...)
@@ -292,31 +303,6 @@ func (m model) footerView() string {
 	info := infoStyle.Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100))
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
-}
-
-func (m MenuItem) Render() string {
-	return m.RenderWithBaseStyle(lipgloss.NewStyle())
-}
-
-func (m MenuItem) RenderWithBaseStyle(baseStyle lipgloss.Style) string {
-	r := strings.Builder{}
-
-	style := baseStyle.Foreground(menuAccentColor)
-
-	before, after, found := strings.Cut(m.name, m.keybind)
-
-	if found {
-		r.WriteString(baseStyle.Render(before))
-		r.WriteString(style.Render(m.keybind))
-		r.WriteString(baseStyle.Render(after))
-
-	} else {
-		r.WriteString(baseStyle.Render(m.name + " ("))
-		r.WriteString(style.Render(m.keybind))
-		r.WriteString(baseStyle.Render(")"))
-	}
-
-	return r.String()
 }
 
 func renderPlan(m model, step steps.Step) *tree.Tree {
@@ -467,33 +453,33 @@ func renderStepsInState(m model, state string) string {
 	return render
 }
 
-func DoTea(eventChan chan events.EventWithId) *tea.Program {
-	tabs := []MenuItem{
-		{
+func DoTea(eventMgr *events.Manager) *tea.Program {
+	tabs := []Button{
+		MenuItem{
 			name:    "plan",
 			keybind: "p",
 		},
-		{
+		MenuItem{
 			name:    "logs",
 			keybind: "l",
 		},
-		{
+		MenuItem{
 			name:    "running",
 			keybind: "r",
 		},
-		{
+		MenuItem{
 			name:    "queue",
 			keybind: "u",
 		},
-		{
+		MenuItem{
 			name:    "done",
 			keybind: "d",
 		},
-		{
+		MenuItem{
 			name:    "failed",
 			keybind: "f",
 		},
-		{
+		MenuItem{
 			name:    "all",
 			keybind: "a",
 		},
@@ -502,14 +488,15 @@ func DoTea(eventChan chan events.EventWithId) *tea.Program {
 	tabKeyBinds := make(map[string]int)
 	tabContent := make([]string, 0)
 
-	for tabIndex, menuItem := range tabs {
-		tabKeyBinds[menuItem.keybind] = tabIndex
+	for tabIndex, button := range tabs {
+		tabKeyBinds[button.Keybind()] = tabIndex
 
 		tabContent = append(tabContent, "")
 	}
 
 	p := tea.NewProgram(
 		model{
+			eventMgr:        eventMgr,
 			viewportContent: "",
 			gotPlan:         false,
 			Tabs:            tabs,
@@ -523,6 +510,8 @@ func DoTea(eventChan chan events.EventWithId) *tea.Program {
 		tea.WithMouseCellMotion(),
 	)
 
+	eventChan := eventMgr.Subscribe()
+
 	go func() {
 		for {
 			event := <-eventChan
@@ -531,4 +520,14 @@ func DoTea(eventChan chan events.EventWithId) *tea.Program {
 	}()
 
 	return p
+}
+
+func keybindDisplayName(keybind string) string {
+	switch keybind {
+	case " ":
+		return "space"
+
+	default:
+		return keybind
+	}
 }

@@ -46,10 +46,15 @@ type Planner struct {
 	queueLock   sync.RWMutex
 	queuedSteps []steps.Step // steps awaiting processing
 	retryCounts *cache.LockedMap[int]
+
+	paused      bool
+	pauseReason string
 }
 
 func NewPlanner(eventMgr *events.Manager, hosts map[string]nix.Host, opts *common.MorphOptions, constraints []nix.Constraint) *Planner {
-	return &Planner{
+	eventChan := eventMgr.Subscribe()
+
+	planner := &Planner{
 		Hosts:        hosts,
 		MorphOptions: opts,
 
@@ -61,16 +66,38 @@ func NewPlanner(eventMgr *events.Manager, hosts map[string]nix.Host, opts *commo
 		StepStatus:  cache.NewLockedMap[string]("steps-done"),
 		Steps:       cache.NewLockedMap[steps.Step]("steps"),
 		retryCounts: cache.NewLockedMap[int]("retries"),
+
+		paused: false,
 	}
+
+	go func() {
+		for event := range eventChan {
+			switch event.Event.(type) {
+			case events.Pause:
+				planner.Pause()
+				eventMgr.SendEvent(events.StatePaused{})
+
+			case events.Unpause:
+				planner.Unpause()
+				eventMgr.SendEvent(events.StateUnpaused{})
+			}
+		}
+	}()
+
+	return planner
 }
 
 func (planner *Planner) Run(ctx context.Context) error {
 	planner.context = ctx
 
-	// FIXME: This doesn't terminate
 	for len(planner.queuedSteps) > 0 || len(planner.StepsNotTerminated()) > 0 {
 		// Run everything needed for every iteration
-		planner.processQueue()
+
+		if !planner.paused {
+			planner.processQueue()
+		} else {
+			log.Info().Str("component", "planner").Msgf("Planner paused. Reason: %v", planner.pauseReason)
+		}
 
 		time.Sleep(time.Second)
 
@@ -84,6 +111,18 @@ func (planner *Planner) Run(ctx context.Context) error {
 func (planner *Planner) tick() {
 	// FIXME: Ticking disabled
 	//planner.tickChan <- true
+}
+
+func (planner *Planner) IsPaused() bool {
+	return planner.paused
+}
+
+func (planner *Planner) Pause() {
+	planner.paused = true
+}
+
+func (planner *Planner) Unpause() {
+	planner.paused = false
 }
 
 func (planner *Planner) StepsNotTerminated() []string {

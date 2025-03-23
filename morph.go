@@ -79,7 +79,7 @@ func main() {
 	eventManager := events.NewManager()
 
 	// Don't actually run the UI unless activated
-	tui := ui.DoTea(eventManager.Subscribe())
+	tui := ui.DoTea(eventManager)
 
 	if !*opts.JsonOut {
 		go func() {
