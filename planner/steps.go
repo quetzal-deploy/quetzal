@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"fmt"
 
-	"github.com/google/uuid"
-
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/steps"
 )
@@ -37,87 +35,19 @@ type RequestPlus struct {
 	Timeout int
 }
 
-func CreateStep(description string, actionName string, action steps.Action, parallel bool, steps_ []steps.Step, onFailure string, dependencies []string) steps.Step {
-	step := steps.Step{
-		Id:          uuid.New().String(),
-		Description: description,
-		ActionName:  actionName,
-		Action:      action,
-		Parallel:    parallel,
-		Steps:       steps_,
-		OnFailure:   onFailure,
-		DependsOn:   dependencies,
-		CanResume:   true,
-	}
-
-	return step
-}
-
-func EmptyStep() steps.Step {
-	step := steps.Step{
-		Id:          uuid.New().String(),
-		Description: "",
-		ActionName:  "none",
-		Action:      &steps.None{},
-		Parallel:    false,
-		Steps:       make([]steps.Step, 0),
-		OnFailure:   "",
-		DependsOn:   make([]string, 0),
-		CanResume:   true,
-		Labels:      make(map[string]string),
-	}
-
-	return step
-}
-
-func AddSteps(plan steps.Step, steps ...steps.Step) steps.Step {
-	plan.Steps = append(plan.Steps, steps...)
-
-	// for _, step := range steps {
-	// 	plan.DependsOn = append(plan.DependsOn, step.Id)
-	// 	plan.Steps = append(plan.Steps, step)
-	// }
-
-	return plan
-}
-
-func AddStepsSeq(plan steps.Step, steps ...steps.Step) steps.Step {
-	for _, step := range steps {
-		if len(plan.Steps) > 0 {
-			// If there's existing steps, get the ID of the last one and add it as dependency to the current one
-			step.DependsOn = append(step.DependsOn, plan.Steps[len(plan.Steps)-1].Id)
-		}
-
-		plan.Steps = append(plan.Steps, step)
-	}
-
-	return plan
-}
-
-func EmptySteps() []steps.Step {
-	return make([]steps.Step, 0)
-}
-
-func MakeDependencies(dependencies ...string) []string {
-	deps := make([]string, 0)
-	deps = append(deps, dependencies...)
-
-	return deps
-}
-
 func CreateBuildPlan(hosts []nix.Host) steps.Step {
 	hostNames := make([]string, 0)
 	for _, host := range hosts {
 		hostNames = append(hostNames, host.Name)
 	}
 
-	action := steps.Build{
-		Hosts: hostNames,
-	}
-
-	buildStep := CreateStep("build hosts", "build", &action, false, EmptySteps(), "exit", make([]string, 0))
-	buildStep.Id = "build:" + buildStep.Id
-	return buildStep
+	return steps.New().
+		Description("build hosts").
+		Action(&steps.Build{
+			Hosts: hostNames,
+		}).
+		ExitOnFailure().
+		Build()
 }
 
 func pushId(host nix.Host) string {
@@ -129,45 +59,29 @@ func deployId(host nix.Host) string {
 }
 
 func CreateStepGetSudoPasswd() steps.Step {
-	step := EmptyStep()
-	step.Description = "Get sudo password"
-	step.ActionName = "get-sudo-passwd"
-	step.Action = &steps.GetSudoPasswd{}
-	step.CanResume = false
-
-	return step
+	return steps.New().
+		Description("Get sudo password").
+		Action(&steps.GetSudoPasswd{}).
+		DisableResume().
+		Build()
 }
 
 func CreateStepSkip(skippedStep steps.Step) steps.Step {
-	step := EmptyStep()
-	step.Description = skippedStep.ActionName + ": " + skippedStep.Description
-	step.ActionName = "skip"
-
-	return step
+	return steps.New().
+		Description(skippedStep.Action.Name() + ": " + skippedStep.Description).
+		Action(&steps.Skip{}).
+		Build()
 }
 
 func CreateStepPush(host nix.Host) steps.Step {
-	push := steps.Push{
-		Host: host.Name,
-	}
-
-	step := CreateStep(fmt.Sprintf("push to %s", host.Name), "push", &push, false, EmptySteps(), "exit", make([]string, 0))
-	step.Id = pushId(host)
-
-	return step
-}
-
-func CreatePushPlan(buildId string, hosts []nix.Host) steps.Step {
-	pushParent := CreateStep("push to hosts", "none", &steps.None{}, true, EmptySteps(), "exit", MakeDependencies(buildId))
-
-	for _, host := range hosts {
-		pushParent = AddSteps(
-			pushParent,
-			CreateStepPush(host),
-		)
-	}
-
-	return pushParent
+	return steps.New().
+		Id(pushId(host)).
+		Description(fmt.Sprintf("push to %s", host.Name)).
+		Action(&steps.Push{
+			Host: host.Name,
+		}).
+		ExitOnFailure().
+		Build()
 }
 
 // func CreateStepHealthChecks(host nix.Host, checks healthchecks.HealthChecks) Step {
@@ -233,22 +147,18 @@ func CreateStepChecks(hint string, host nix.Host, localCommands []CommandPlus, r
 }
 
 func CreateStepReboot(host nix.Host) steps.Step {
-	step := EmptyStep()
-	step.Description = "reboot " + host.Name
-	step.ActionName = "reboot"
-	step.Action = &steps.Reboot{Host: host.Name}
-
-	return step
+	return steps.New().
+		Description("reboot " + host.Name).
+		Action(&steps.Reboot{Host: host.Name}).
+		Build()
 }
 
 // FIXME: change to remote command
 func CreateStepIsOnline(host nix.Host) steps.Step {
-	step := EmptyStep()
-	step.ActionName = "is-online"
-	step.Action = &steps.IsOnline{Host: host.Name}
-	step.Description = "test if " + host.Name + " is online"
-
-	return step
+	return steps.New().
+		Description("test if " + host.Name + " is online").
+		Action(&steps.IsOnline{Host: host.Name}).
+		Build()
 }
 
 func CreateStepWaitForOnline(host nix.Host) steps.Step {
@@ -260,47 +170,44 @@ func CreateStepWaitForOnline(host nix.Host) steps.Step {
 }
 
 func CreateStepRebootAndWait(host nix.Host) steps.Step {
-	step := EmptyStep()
-	step.Description = fmt.Sprintf("reboot '%s' and wait for it to come online", host.Name)
-
-	reboot := CreateStepReboot(host)
-	waitForOnline := CreateStepWaitForOnline(host)
-
-	return AddStepsSeq(step, reboot, waitForOnline)
+	return steps.New().
+		Description(fmt.Sprintf("reboot '%s' and wait for it to come online", host.Name)).
+		AddSequentialSteps(
+			CreateStepReboot(host),
+			CreateStepWaitForOnline(host)).Build()
 }
 
 func CreateStepGate(description string) steps.Step {
-	step := EmptyStep()
-	step.ActionName = "gate"
-	step.Action = &steps.Gate{}
-	step.Description = description
-	step.Parallel = true
-	step.OnFailure = "retry"
-
-	return step
+	return steps.New().
+		Description(description).
+		Action(&steps.Gate{}).
+		RetryOnFailure().
+		Parallel().
+		Build()
 }
 
 // commands
 
 func createStepCommand(location string, host nix.Host, command Command) steps.Step {
-	step := EmptyStep()
+	step := steps.New().
+		Description(command.Description)
 
 	switch location {
 	case "local":
-		step.ActionName = "local-command"
+		step.Action(&steps.LocalCommand{
+			Command: command.Command,
+			Timeout: 0,
+		})
 	case "remote":
-		step.ActionName = "remote-command"
+		step.Action(&steps.RemoteCommand{
+			Command: command.Command,
+			Timeout: 0,
+		})
 	default:
 		panic("Unknown location type")
 	}
 
-	step.Description = command.Description
-	step.Action = &steps.RemoteCommand{
-		Command: command.Command,
-		Timeout: 0,
-	}
-
-	return step
+	return step.Build()
 }
 
 func CreateStepLocalCommand(host nix.Host, command Command) steps.Step {
@@ -315,47 +222,35 @@ func CreateStepRemoteCommand(host nix.Host, command Command) steps.Step {
 
 // FIXME: Get rid of the health check types
 func CreateStepLocalHttpRequest(host nix.Host, req steps.Request) steps.Step {
-	step := EmptyStep()
-
-	step.Description = req.Description
-	step.Action = &steps.LocalRequest{
-		Request: req,
-		Timeout: 0,
-	}
-	step.ActionName = step.Action.Name()
-
-	return step
+	return steps.New().
+		Description(req.Description).
+		Action(&steps.LocalRequest{
+			Request: req,
+			Timeout: 0,
+		}).
+		Build()
 }
 
 // FIXME: Get rid of the health check types
 func CreateStepRemoteHttpRequest(host nix.Host, req steps.Request) steps.Step {
-	step := EmptyStep()
-
-	step.Description = req.Description
-	step.Action = &steps.RemoteRequest{
-		Request: req,
-		Timeout: 0,
-	}
-	step.ActionName = step.Action.Name()
-
-	return step
+	return steps.New().
+		Description(req.Description).
+		Action(&steps.RemoteRequest{
+			Request: req,
+			Timeout: 0}).
+		Build()
 }
 
 // deploy wrappers
 
 func createStepDeploy(deployAction steps.Action, host nix.Host, dependencies ...steps.Step) steps.Step {
-	step := EmptyStep()
-	step.Id = deployId(host)
-	step.Description = "deploy " + host.Name
-	step.ActionName = deployAction.Name()
-	step.Action = deployAction
-	step.OnFailure = ""
-
-	for _, dependency := range dependencies {
-		step.DependsOn = append(step.DependsOn, dependency.Id)
-	}
-
-	return step
+	return steps.New().
+		Id(deployId(host)).
+		Description("deploy " + host.Name).
+		Action(deployAction).
+		DoNothingOnFailure().
+		AddDependenciesSteps(dependencies...).
+		Build()
 }
 
 func CreateStepDeployBoot(host nix.Host, dependencies ...steps.Step) steps.Step {
@@ -389,7 +284,7 @@ func WriteDotFile(writer *bufio.Writer, plan steps.Step) {
 func CreateDotBla(writer *bufio.Writer, step steps.Step) {
 	fmt.Println(step.Description)
 
-	switch step.ActionName {
+	switch step.Action.Name() {
 	case "":
 		fallthrough
 	case "none":
@@ -405,7 +300,7 @@ func CreateDotBla(writer *bufio.Writer, step steps.Step) {
 		}
 		writer.WriteString("\", shape=record, style=rounded]\n")
 	default:
-		writer.WriteString(fmt.Sprintf("\t\"%s\"[label = \"<f0> %s | <f1> %s\", shape=record, style=rounded]\n", step.Id, step.ActionName, step.Description))
+		writer.WriteString(fmt.Sprintf("\t\"%s\"[label = \"<f0> %s | <f1> %s\", shape=record, style=rounded]\n", step.Id, step.Action.Name(), step.Description))
 	}
 
 	for _, dependency := range step.DependsOn {

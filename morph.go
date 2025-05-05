@@ -12,17 +12,20 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/DBCDK/kingpin"
+
 	"github.com/DBCDK/morph/cliparser"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/cruft"
 	"github.com/DBCDK/morph/events"
+	"github.com/DBCDK/morph/internal/constraints"
+	"github.com/DBCDK/morph/internal/daemon"
+	"github.com/DBCDK/morph/internal/http"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/planner"
 	"github.com/DBCDK/morph/steps"
@@ -77,6 +80,19 @@ func main() {
 	}
 
 	eventManager := events.NewManager()
+	logManager := events.NewManager()
+
+	go func() {
+		for event := range eventManager.Subscribe() {
+			switch event.Event.(type) {
+			case events.QueueStatus:
+
+			default:
+				log.Debug().Msg("")
+				log.Debug().Msg(pretty.Sprint(event.Event))
+			}
+		}
+	}()
 
 	// Don't actually run the UI unless activated
 	tui := ui.DoTea(eventManager)
@@ -90,7 +106,8 @@ func main() {
 		}()
 
 		log.Logger = log.Output(zerolog.ConsoleWriter{
-			Out: eventManager.NewLogWriter(),
+			Out:     logManager.NewLogWriter(),
+			NoColor: true,
 		})
 
 	} else {
@@ -114,7 +131,9 @@ func main() {
 	switch clause {
 
 	case cmdClauses.Daemon.FullCommand():
-		events.ServeHttp(opts, 8123, eventManager, opts.DeploymentsDir)
+		daemon := daemon.NewDaemon(opts)
+		daemon.LoadDeployments(opts.DeploymentsDir)
+		http.Run(&daemon, 8123, eventManager, opts.DeploymentsDir)
 		return
 
 	case cmdClauses.PlanRun.FullCommand():
@@ -144,7 +163,7 @@ func main() {
 
 		plan := createPlan(cmdClauses, opts, hosts, clause)
 		if !*opts.JsonOut {
-			eventManager.SendEvent(plan)
+			eventManager.SendEvent(events.RegisterPlan{Plan: plan})
 		}
 
 		planJson, err := json.Marshal(plan)
@@ -175,64 +194,51 @@ func main() {
 			return
 		}
 
-		constraints := deploymentMetadata.Constraints
+		mergedConstraints := make([]constraints.Constraint, 0)
+		defaultConstraints := make([]constraints.Constraint, 0)
 
-		constraintsArgs := make([]nix.Constraint, 0)
-		constraintsDefaults := make([]nix.Constraint, 0)
-
-		for _, c := range *opts.ConstraintsFlag {
-			if len(c) == 0 {
-				continue
-			}
-
-			// arguments look like this: labelKey=labelValue:constraintType:constraintValue, e.g. location=dc1:maxUnavailable=2
-			parts := strings.SplitN(c, ":", 2)
-			labelHalf := parts[0]
-			constraintHalf := parts[1]
-			labelParts := strings.SplitN(labelHalf, "=", 2)
-
-			labelKey := labelParts[0]
-			labelValue := labelParts[1]
-			labelSelector := nix.LabelSelector{Label: labelKey, Value: labelValue}
-
-			constraintParts := strings.SplitN(constraintHalf, "=", 2)
-
-			constraintType := constraintParts[0]
-			constraintValue := constraintParts[1]
-
-			switch strings.ToLower(constraintType) {
-			case "maxunavailable":
-				maxUnavailable, err := strconv.Atoi(constraintValue)
-				if err != nil {
-					log.Fatal().Msg("Invalid value in constraint - not an integer: " + constraintValue)
-				}
-				constraintsArgs = append(constraintsArgs, nix.NewConstraint(labelSelector, maxUnavailable))
-
-			default:
-				log.Fatal().Msg("Unknown constraint type: " + constraintType)
-			}
+		constraintsArgs, err := cliparser.ParseConstraints(*opts.ConstraintsFlag)
+		if err != nil {
+			log.Fatal().Err(err).Msg(err.Error())
 		}
 
-		constraintsDefaults = append(constraintsDefaults, nix.NewConstraint(nix.LabelSelector{Label: "_", Value: "host"}, 1))
+		mergedConstraints = append(mergedConstraints, constraintsArgs...)
+		mergedConstraints = append(mergedConstraints, deploymentMetadata.Constraints...)
 
-		constraints = append(constraints, constraintsArgs...)
-		constraints = append(constraints, deploymentMetadata.Constraints...)
-		constraints = append(constraints, constraintsDefaults...)
+		defaultConstraints = append(defaultConstraints, constraints.NewConstraint(constraints.LabelSelector{Label: "_", Value: "host"}, 1))
+
+		for _, defaultConstraint := range defaultConstraints {
+			add := true
+
+			for _, constraint := range mergedConstraints {
+				if defaultConstraint.Selector.Match(constraint.Selector.Label, constraint.Selector.Value) {
+					add = false
+					break
+				}
+			}
+
+			if add {
+				mergedConstraints = append(mergedConstraints, defaultConstraint)
+			}
+		}
 
 		log.Debug().Msg("constraints:")
-		for _, c := range constraints {
+		for _, c := range mergedConstraints {
 			log.Debug().Msg(fmt.Sprintf("- %s=%s: %v\n", c.Selector.Label, c.Selector.Value, c))
 		}
+		eventManager.SendEvent(events.Debug{Data: fmt.Sprintf("constraints: %#v", mergedConstraints)})
 
 		if false {
 			os.Exit(17)
 		}
 
-		planner_ := planner.NewPlanner(eventManager, hostsMap, opts, constraints)
+		planner_ := planner.NewPlanner(eventManager, hostsMap, opts, mergedConstraints)
 
 		go planner_.StepMonitor()
 
 		planner_.QueueStep(plan)
+
+		go http.Run(nil, 8123, eventManager, opts.DeploymentsDir)
 
 		err = planner_.Run(context.TODO())
 		if err != nil {
@@ -277,27 +283,28 @@ func main() {
 // TODO: Different planners should have default constraints exposed, to be displayed in the UI for suggestions to override
 // FIXME: Refactor to not need cmdClauses and opts
 func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptions, hosts []nix.Host, clause string) steps.Step {
-	plan := planner.EmptyStep()
-	plan.Id = "root"
-	plan.Description = "Root of execution plan"
-	plan.Parallel = true
+	plan := steps.New().
+		Id("root").
+		Description("Root of execution plan").
+		Parallel()
 
 	buildPlan := planner.CreateBuildPlan(hosts)
 
-	hostSpecificPlans := make(map[string]steps.Step, 0)
+	hostSpecificPlans := make(map[string]*steps.StepBuilder, 0)
 
 	for _, host := range hosts {
-		hostSpecificPlan := planner.EmptyStep()
-		hostSpecificPlan.Id = "host:" + host.Name
-		hostSpecificPlan.Description = "host: " + host.Name
-		hostSpecificPlan.Action = &steps.None{}
-		hostSpecificPlan.Parallel = false
-		hostSpecificPlan.DependsOn = []string{buildPlan.Id}
-		hostSpecificPlan.Labels = host.Labels
-		if _, hasHostLabel := hostSpecificPlan.Labels["host"]; !hasHostLabel {
-			hostSpecificPlan.Labels["host"] = host.Name // TODO: Document implicit labels
+
+		hostSpecificPlan := steps.New().
+			Id("host:"+host.Name).
+			Description("host: "+host.Name).
+			Labels(host.Labels).
+			Label("_", "host").
+			Action(&steps.None{}).
+			AddDependencies(buildPlan.Id)
+
+		if _, hasHostLabel := host.Labels["host"]; !hasHostLabel {
+			hostSpecificPlan.Label("host", host.Name) // TODO: Document implicit labels
 		}
-		hostSpecificPlan.Labels["_"] = "host"
 
 		hostSpecificPlans[host.Name] = hostSpecificPlan
 	}
@@ -305,29 +312,26 @@ func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptio
 	stepGetSudoPasswd := planner.CreateStepGetSudoPasswd()
 
 	if opts.AskForSudoPasswd {
-		plan = planner.AddSteps(plan, stepGetSudoPasswd)
+		plan.AddSteps(stepGetSudoPasswd)
 	}
 
 	switch clause {
 	case cmdClauses.Build.FullCommand():
 
-		plan = planner.AddSteps(plan, buildPlan)
+		plan.AddSteps(buildPlan)
 
 	case cmdClauses.Push.FullCommand():
 
-		plan = planner.AddSteps(plan, buildPlan)
+		plan.AddSteps(buildPlan)
 
 		for _, host := range hosts {
 			push := planner.CreateStepPush(host)
 
-			hostSpecificPlans[host.Name] = planner.AddStepsSeq(
-				hostSpecificPlans[host.Name],
-				push,
-			)
+			hostSpecificPlans[host.Name].AddSequentialSteps(push)
 		}
 
 	case cmdClauses.Deploy.FullCommand():
-		plan = planner.AddSteps(plan, buildPlan)
+		plan.AddSteps(buildPlan)
 
 		for _, host := range hosts {
 			push := planner.CreateStepPush(host)
@@ -377,16 +381,14 @@ func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptio
 
 			switch opts.DeploySwitchAction {
 			case "dry-activate":
-				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
-					hostSpecificPlans[host.Name],
+				hostSpecificPlans[host.Name].AddSequentialSteps(
 					push,
 					deployDryActivate,
 				)
 
 			case "test":
 				// FIXME: requires upload secrets
-				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
-					hostSpecificPlans[host.Name],
+				hostSpecificPlans[host.Name].AddSequentialSteps(
 					push,
 					preDeployChecks,
 					deployTest,
@@ -394,8 +396,7 @@ func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptio
 				)
 
 			case "switch":
-				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
-					hostSpecificPlans[host.Name],
+				hostSpecificPlans[host.Name].AddSequentialSteps(
 					push,
 					preDeployChecks,
 					deploySwitch,
@@ -404,8 +405,7 @@ func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptio
 
 			case "boot":
 				// FIXME: requires upload secrets
-				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
-					hostSpecificPlans[host.Name],
+				hostSpecificPlans[host.Name].AddSequentialSteps(
 					push,
 					deployBoot,
 				)
@@ -413,8 +413,7 @@ func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptio
 
 			// reboot can be added to any action, even if weird..
 			if opts.DeployReboot {
-				hostSpecificPlans[host.Name] = planner.AddStepsSeq(
-					hostSpecificPlans[host.Name],
+				hostSpecificPlans[host.Name].AddSequentialSteps(
 					stepReboot,
 					stepWaitForOnline,
 					healthChecks,
@@ -424,7 +423,7 @@ func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptio
 
 	case cmdClauses.HealthCheck.FullCommand():
 
-		plan = planner.AddSteps(plan, buildPlan)
+		plan.AddSteps(buildPlan)
 
 		for _, host := range hosts {
 			push := planner.CreateStepPush(host)
@@ -438,8 +437,7 @@ func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptio
 				planner.HealthChecksToRequests(host.HealthChecks.Http),
 			)
 
-			hostSpecificPlans[host.Name] = planner.AddStepsSeq(
-				hostSpecificPlans[host.Name],
+			hostSpecificPlans[host.Name].AddSequentialSteps(
 				push,
 				healthChecks,
 			)
@@ -456,13 +454,14 @@ func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptio
 
 	}
 
-	for _, serverPlan := range hostSpecificPlans {
+	for _, serverPlanBuilder := range hostSpecificPlans {
+		serverPlan := serverPlanBuilder.Build()
 		// FIXME: This is a bit too much of a hack just to
 		// avoid build including empty plans
 		if len(serverPlan.Steps) > 0 {
-			plan = planner.AddSteps(plan, serverPlan)
+			plan.AddSteps(serverPlan)
 		}
 	}
 
-	return plan
+	return plan.Build()
 }

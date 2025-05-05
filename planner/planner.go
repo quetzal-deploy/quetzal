@@ -16,6 +16,7 @@ import (
 	"github.com/DBCDK/morph/cache"
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/events"
+	"github.com/DBCDK/morph/internal/constraints"
 	"github.com/DBCDK/morph/logging"
 	"github.com/DBCDK/morph/nix"
 	"github.com/DBCDK/morph/steps"
@@ -38,7 +39,7 @@ type Planner struct {
 	Cache        *cache.LockedMap[string]
 	StepStatus   *cache.LockedMap[string]
 	Steps        *cache.LockedMap[steps.Step]
-	Constraints  []nix.Constraint
+	Constraints  []constraints.Constraint
 	EventManager *events.Manager
 
 	context     context.Context
@@ -51,7 +52,7 @@ type Planner struct {
 	pauseReason string
 }
 
-func NewPlanner(eventMgr *events.Manager, hosts map[string]nix.Host, opts *common.MorphOptions, constraints []nix.Constraint) *Planner {
+func NewPlanner(eventMgr *events.Manager, hosts map[string]nix.Host, opts *common.MorphOptions, constraints []constraints.Constraint) *Planner {
 	eventChan := eventMgr.Subscribe()
 
 	planner := &Planner{
@@ -99,7 +100,7 @@ func (planner *Planner) Run(ctx context.Context) error {
 			log.Info().Str("component", "planner").Msgf("Planner paused. Reason: %v", planner.pauseReason)
 		}
 
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 
 		// Wait for next tick
 		// FIXME: make ticking work (and not block)
@@ -157,7 +158,7 @@ func (planner *Planner) processQueue() {
 		// TODO: log if rejected by dependencies or the solver
 		dependenciesSatisfied, blockedBy := planner.DependenciesSatisfied(step.DependsOn)
 		//solverSatisfied := planner.CanStartStep(step, planner.Steps.GetCopy(), planner.StepStatus.GetCopy(), planner.Constraints)
-		solverSatisfied := planner.CanStartStep(step)
+		solverSatisfied, solverReason := planner.CanStartStep(step)
 
 		//if dependenciesSatisfied, blockedBy := planner.DependenciesSatisfied(step.DependsOn); dependenciesSatisfied && planner.CanStartStep(step) {
 		if dependenciesSatisfied && solverSatisfied {
@@ -203,6 +204,14 @@ func (planner *Planner) processQueue() {
 
 		} else {
 			// TODO: use the list of non-ready in the UI
+
+			if !dependenciesSatisfied {
+				planner.EventManager.SendEvent(events.Debug{Data: fmt.Sprintf("dependencies not satisfied: %s blocked by %v", step.Id, blockedBy)})
+			}
+
+			if !solverSatisfied {
+				planner.EventManager.SendEvent(events.Debug{Data: fmt.Sprintf("solver not satisfied: %s, reason: %s", step.Id, solverReason)})
+			}
 
 			stepsStillQueued = append(stepsStillQueued, step)
 			zLogAfter.Str(step.Id)
@@ -282,7 +291,7 @@ func (planner *Planner) StepMonitor() {
 			log.Debug().
 				Dict("step", zerolog.Dict().
 					Str("id", step.Id).
-					Str("action", step.ActionName)).
+					Str("action", step.Action.Name())).
 				Msg(fmt.Sprintf("step: " + stepId + " state: " + data[stepId]))
 		}
 
@@ -387,7 +396,7 @@ func weightsOfOnes(numberOfOnes int) []int {
 }
 
 // Make sure to lock the queue before calling this, or results will be inconsistent
-func (planner *Planner) CanStartStep(step steps.Step) bool {
+func (planner *Planner) CanStartStep(step steps.Step) (bool, string) {
 	//func CanStartStep(step steps.Step, allSteps map[string]steps.Step, stepStatus map[string]string, constraints []nix.Constraint) bool {
 	log.Debug().
 		Str("component", "solver").Str("stepId", step.Id).
@@ -398,7 +407,7 @@ func (planner *Planner) CanStartStep(step steps.Step) bool {
 		log.Debug().
 			Str("component", "solver").Str("stepId", step.Id).
 			Msg("CanStartStep: YES (reason: no labels)")
-		return true
+		return true, "no labels"
 	}
 
 	pbConstraints := make([]solver.PBConstr, 0)
@@ -464,7 +473,7 @@ func (planner *Planner) CanStartStep(step steps.Step) bool {
 				//status, ok := stepStatus[id]
 				if err != nil {
 					// TODO: Log fatal here
-					return false
+					return false, fmt.Sprintf("couldn't get step status for step: %s", id)
 				}
 
 				allHosts = append(allHosts, i)
@@ -552,11 +561,14 @@ func (planner *Planner) CanStartStep(step steps.Step) bool {
 		x.
 			Array("model", logging.ArrayToZLogArray(s.Model())).
 			Msg("solve successful")
-	} else {
-		x.Msgf("solve failed: %s", status)
-	}
 
-	return status == solver.Sat
+		return true, "solve successful"
+	} else {
+		reason := fmt.Sprintf("solve failed: %s. Problem: %s", status, pb.PBString())
+		x.Msg(reason)
+
+		return false, reason
+	}
 }
 
 func (planner *Planner) waitForChildrenToComplete(ctx context.Context, step steps.Step) {
@@ -569,7 +581,7 @@ func (planner *Planner) waitForChildrenToComplete(ctx context.Context, step step
 		if satisfied, _ := planner.DependenciesSatisfied(childIds); satisfied {
 			return
 		} else {
-			time.Sleep(time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }

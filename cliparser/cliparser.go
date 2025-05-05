@@ -169,6 +169,8 @@ func daemonCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdCla
 		Required().
 		StringVar(&cfg.DeploymentsDir)
 
+	selectorFlags(cmd, cfg) // FIXME: Stop depending on kingpin setting correct default values
+
 	return cmd
 }
 

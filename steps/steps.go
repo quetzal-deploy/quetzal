@@ -21,6 +21,18 @@ type Step struct {
 	Labels        map[string]string `json:"labels,omitempty"`
 }
 
+func (step Step) WithId(id string) Step {
+	step.Id = id
+
+	return step
+}
+
+func (step Step) WithLabel(key string, value string) Step {
+	step.Labels[key] = value
+
+	return step
+}
+
 type StepAlias Step
 
 // The following MarshalJSON contains a lot of code that looks
@@ -40,7 +52,7 @@ type StepAlias Step
 // }
 
 func (step Step) MarshalJSON() ([]byte, error) {
-	switch step.ActionName {
+	switch step.Action.Name() {
 	case None{}.Name():
 		fallthrough
 	case Gate{}.Name():
@@ -52,6 +64,9 @@ func (step Step) MarshalJSON() ([]byte, error) {
 		return step.Action.MarshalJSONx(step)
 
 	case Push{}.Name():
+		return step.Action.MarshalJSONx(step)
+
+	case Delay{}.Name():
 		return step.Action.MarshalJSONx(step)
 
 	case DeployBoot{}.Name():
@@ -85,7 +100,7 @@ func (step Step) MarshalJSON() ([]byte, error) {
 		return step.Action.MarshalJSONx(step)
 
 	default:
-		return nil, errors.New("unmarshall: unknown action: " + step.ActionName)
+		return nil, errors.New("unmarshall: unknown action: " + step.Action.Name())
 	}
 }
 

@@ -194,9 +194,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case events.QueueStatus:
 		m.queue = msg.Queue
 
-	case steps.Step:
+	case events.RegisterPlan:
 		m.gotPlan = true
-		m.plan = msg
+		m.plan = msg.Plan
 	}
 
 	m.viewport, cmd = m.viewport.Update(msg)

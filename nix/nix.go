@@ -18,6 +18,7 @@ import (
 
 	"github.com/DBCDK/morph/common"
 	"github.com/DBCDK/morph/healthchecks"
+	"github.com/DBCDK/morph/internal/constraints"
 	"github.com/DBCDK/morph/logging"
 	"github.com/DBCDK/morph/secrets"
 	"github.com/DBCDK/morph/ssh"
@@ -44,38 +45,10 @@ type HostOrdering struct {
 	Tags []string
 }
 
-type Constraint struct {
-	Selector       LabelSelector `json:"selector"`
-	MaxUnavailable int           `json:"maxUnavailable"`
-}
-
-func NewConstraint(selector LabelSelector, maxUnavailable int) Constraint {
-	return Constraint{
-		Selector:       selector,
-		MaxUnavailable: maxUnavailable,
-	}
-}
-
-// Set default values for a Constraint when being unmarshalled
-func (c *Constraint) UnmarshalJSON(data []byte) error {
-	type ConstraintAlias Constraint
-	return json.Unmarshal(data, (*ConstraintAlias)(c))
-}
-
-// FIXME: Make LabelSelector a map[string]string where all labels have to match
-type LabelSelector struct {
-	Label string
-	Value string
-}
-
-func (ls LabelSelector) Match(label string, value string) bool {
-	return ls.Label == label && (ls.Value == "*" || value == "*" || ls.Value == value)
-}
-
 type DeploymentMetadata struct {
 	Description string
 	Ordering    HostOrdering
-	Constraints []Constraint
+	Constraints []constraints.Constraint
 	Color       string `json:"color"`
 }
 
