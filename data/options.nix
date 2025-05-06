@@ -63,7 +63,7 @@ let
         type = bool;
         description = ''
           Whether to create parent directories to secret destination.
-          In particular, morph will execute `sudo mkdir -p -m 755 /path/to/secret/destination`
+          In particular, Quetzal will execute `sudo mkdir -p -m 755 /path/to/secret/destination`
           prior to moving the secret in place.
         '';
       };

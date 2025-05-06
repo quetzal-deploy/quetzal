@@ -1,7 +1,7 @@
 { nixosTest, packages, ... }:
 
 nixosTest {
-  name = "morph-deployment-test";
+  name = "quetzal-deployment-test";
   nodes =
     let
       boot.loader = {
@@ -16,7 +16,7 @@ nixosTest {
     {
       deployer = _: {
         inherit services boot;
-        environment.systemPackages = [ packages.morph ];
+        environment.systemPackages = [ packages.quetzal ];
       };
       target = _: { inherit services boot; };
     };

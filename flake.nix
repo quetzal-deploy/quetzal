@@ -31,7 +31,7 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        # Current Version of Morph
+        # Current Version of Quetzal
         # TODO: this sucks...
         version = "dev";
 
@@ -48,7 +48,7 @@
         checks = {
           vm_integration_tests = pkgs.callPackage ./nixos/tests/integration_tests.nix { inherit packages; };
           formatting = treefmtEval.config.build.check self;
-          build = self.packages.${system}.morph;
+          build = self.packages.${system}.quetzal;
           pre-commit-check =
             let
               # some treefmt formatters are not supported in pre-commit-hooks we
@@ -73,12 +73,12 @@
         # Acessible through 'nix develop' or 'nix-shell' (legacy)
         devShells.default = pkgs.mkShell {
           inherit (self.checks.${system}.pre-commit-check) shellHook;
-          inputsFrom = [ self.packages.${system}.morph ];
+          inputsFrom = [ self.packages.${system}.quetzal ];
         };
 
         packages = rec {
-          default = morph;
-          morph = pkgs.callPackage ./default.nix { inherit version; };
+          default = quetzal;
+          quetzal = pkgs.callPackage ./default.nix { inherit version; };
         };
       }
     );

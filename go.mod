@@ -1,4 +1,4 @@
-module github.com/DBCDK/morph
+module github.com/quetzal-deploy/quetzal
 
 go 1.17
 

@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/healthchecks"
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/secrets"
-	"github.com/DBCDK/morph/ssh"
-	"github.com/DBCDK/morph/utils"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/healthchecks"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/secrets"
+	"github.com/quetzal-deploy/quetzal/ssh"
+	"github.com/quetzal-deploy/quetzal/utils"
 )
 
 func ExecListSecrets(hosts []nix.Host) {
@@ -28,7 +28,7 @@ func ExecListSecrets(hosts []nix.Host) {
 	}
 }
 
-func ExecListSecretsAsJson(opts *common.MorphOptions, hosts []nix.Host) error {
+func ExecListSecretsAsJson(opts *common.QuetzalOptions, hosts []nix.Host) error {
 	deploymentDir, err := filepath.Abs(filepath.Dir(opts.Deployment))
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func ExecListSecretsAsJson(opts *common.MorphOptions, hosts []nix.Host) error {
 	return nil
 }
 
-func ExecUploadSecrets(opts *common.MorphOptions, hosts []nix.Host, phase *string) error {
+func ExecUploadSecrets(opts *common.QuetzalOptions, hosts []nix.Host, phase *string) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	for _, host := range hosts {
@@ -85,7 +85,7 @@ func ExecUploadSecrets(opts *common.MorphOptions, hosts []nix.Host, phase *strin
 	return nil
 }
 
-func secretsUpload(opts *common.MorphOptions, filteredHosts []nix.Host, phase *string) error {
+func secretsUpload(opts *common.QuetzalOptions, filteredHosts []nix.Host, phase *string) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	// upload secrets

@@ -3,7 +3,7 @@ package healthchecks
 import (
 	"errors"
 	"fmt"
-	"github.com/DBCDK/morph/ssh"
+	"github.com/quetzal-deploy/quetzal/ssh"
 	"os"
 	"sync"
 	"time"
