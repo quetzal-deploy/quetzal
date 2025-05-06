@@ -4,7 +4,8 @@ import (
 	"strings"
 
 	"github.com/DBCDK/kingpin"
-	"github.com/DBCDK/morph/common"
+
+	"github.com/quetzal-deploy/quetzal/common"
 )
 
 type KingpinCmdClauses struct {
@@ -18,10 +19,10 @@ type KingpinCmdClauses struct {
 	SecretsList   *kingpin.CmdClause
 }
 
-func New(version string, assetRoot string) (*kingpin.Application, *KingpinCmdClauses, *common.MorphOptions) {
-	app := kingpin.New("morph", "NixOS host manager").Version(version)
+func New(version string, assetRoot string) (*kingpin.Application, *KingpinCmdClauses, *common.QuetzalOptions) {
+	app := kingpin.New("quetzal", "NixOS host manager").Version(version)
 
-	options := &common.MorphOptions{
+	options := &common.QuetzalOptions{
 		Version:   version,
 		AssetRoot: assetRoot,
 
@@ -46,40 +47,40 @@ func New(version string, assetRoot string) (*kingpin.Application, *KingpinCmdCla
 	return app, cmdClauses, options
 }
 
-func deploymentArg(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func deploymentArg(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.Arg("deployment", "File containing the nix deployment expression").
 		HintFiles("nix").
 		Required().
 		ExistingFileVar(&cfg.Deployment)
 }
 
-func attributeArg(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func attributeArg(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.Arg("attribute", "Name of attribute to inspect").
 		Required().
 		StringVar(&cfg.AttrKey)
 }
 
-func timeoutFlag(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func timeoutFlag(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.Flag("timeout", "Seconds to wait for commands/healthchecks on a host to complete").
 		Default("0").
 		IntVar(&cfg.Timeout)
 }
 
-func askForSudoPasswdFlag(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func askForSudoPasswdFlag(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.
 		Flag("passwd", "Whether to ask interactively for remote sudo password when needed").
 		Default("False").
 		BoolVar(&cfg.AskForSudoPasswd)
 }
 
-func getSudoPasswdCommand(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func getSudoPasswdCommand(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.
 		Flag("passcmd", "Specify command to run for sudo password").
 		Default("").
 		StringVar(&cfg.PassCmd)
 }
 
-func selectorFlags(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func selectorFlags(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.Flag("on", "Glob for selecting servers in the deployment").
 		Default("*").
 		StringVar(&cfg.SelectGlob)
@@ -99,52 +100,52 @@ func selectorFlags(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
 		StringVar(&cfg.OrderingTags)
 }
 
-func nixBuildTargetFlag(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func nixBuildTargetFlag(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.Flag("target", "A Nix lambda defining the build target to use instead of the default").
 		StringVar(&cfg.NixBuildTarget)
 }
 
-func nixBuildTargetFileFlag(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func nixBuildTargetFileFlag(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.Flag("target-file", "File containing a Nix attribute set, defining build targets to use instead of the default").
 		HintFiles("nix").
 		ExistingFileVar(&cfg.NixBuildTargetFile)
 }
 
-func skipHealthChecksFlag(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func skipHealthChecksFlag(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.
 		Flag("skip-health-checks", "Whether to skip all health checks").
 		Default("False").
 		BoolVar(&cfg.SkipHealthChecks)
 }
 
-func skipPreDeployChecksFlag(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func skipPreDeployChecksFlag(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.
 		Flag("skip-pre-deploy-checks", "Whether to skip all pre-deploy checks").
 		Default("False").
 		BoolVar(&cfg.SkipPreDeployChecks)
 }
 
-func showTraceFlag(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func showTraceFlag(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.
 		Flag("show-trace", "Whether to pass --show-trace to all nix commands").
 		Default("False").
 		BoolVar(&cfg.ShowTrace)
 }
 
-func asJsonFlag(cmd *kingpin.CmdClause, cfg *common.MorphOptions) {
+func asJsonFlag(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) {
 	cmd.
 		Flag("json", "Whether to format the output as JSON instead of plaintext").
 		Default("False").
 		BoolVar(&cfg.AsJson)
 }
 
-func evalCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClause {
+func evalCmd(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) *kingpin.CmdClause {
 	deploymentArg(cmd, cfg)
 	attributeArg(cmd, cfg)
 	return cmd
 }
 
-func buildCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClause {
+func buildCmd(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) *kingpin.CmdClause {
 	selectorFlags(cmd, cfg)
 	showTraceFlag(cmd, cfg)
 	nixBuildTargetFlag(cmd, cfg)
@@ -153,14 +154,14 @@ func buildCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClau
 	return cmd
 }
 
-func pushCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClause {
+func pushCmd(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) *kingpin.CmdClause {
 	selectorFlags(cmd, cfg)
 	showTraceFlag(cmd, cfg)
 	deploymentArg(cmd, cfg)
 	return cmd
 }
 
-func executeCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClause {
+func executeCmd(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) *kingpin.CmdClause {
 	selectorFlags(cmd, cfg)
 	showTraceFlag(cmd, cfg)
 	askForSudoPasswdFlag(cmd, cfg)
@@ -175,7 +176,7 @@ func executeCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdCl
 	return cmd
 }
 
-func deployCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClause {
+func deployCmd(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) *kingpin.CmdClause {
 	switchActions := []string{"dry-activate", "test", "switch", "boot"}
 
 	selectorFlags(cmd, cfg)
@@ -202,7 +203,7 @@ func deployCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdCla
 	return cmd
 }
 
-func healthCheckCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClause {
+func healthCheckCmd(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) *kingpin.CmdClause {
 	selectorFlags(cmd, cfg)
 	showTraceFlag(cmd, cfg)
 	deploymentArg(cmd, cfg)
@@ -210,7 +211,7 @@ func healthCheckCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.C
 	return cmd
 }
 
-func uploadSecretsCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClause {
+func uploadSecretsCmd(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) *kingpin.CmdClause {
 	selectorFlags(cmd, cfg)
 	showTraceFlag(cmd, cfg)
 	askForSudoPasswdFlag(cmd, cfg)
@@ -220,7 +221,7 @@ func uploadSecretsCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin
 	return cmd
 }
 
-func listSecretsCmd(cmd *kingpin.CmdClause, cfg *common.MorphOptions) *kingpin.CmdClause {
+func listSecretsCmd(cmd *kingpin.CmdClause, cfg *common.QuetzalOptions) *kingpin.CmdClause {
 	selectorFlags(cmd, cfg)
 	showTraceFlag(cmd, cfg)
 	deploymentArg(cmd, cfg)

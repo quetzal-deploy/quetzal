@@ -6,9 +6,10 @@ import (
 	"os"
 
 	"github.com/DBCDK/kingpin"
-	"github.com/DBCDK/morph/cliparser"
-	"github.com/DBCDK/morph/cruft"
-	"github.com/DBCDK/morph/utils"
+
+	"github.com/quetzal-deploy/quetzal/cliparser"
+	"github.com/quetzal-deploy/quetzal/cruft"
+	"github.com/quetzal-deploy/quetzal/utils"
 )
 
 // These are set at build time via -ldflags magic
@@ -21,7 +22,7 @@ func setup() {
 	utils.SignalHandler()
 
 	if assetRoot == "" {
-		handleError(errors.New("Morph must be compiled with \"-ldflags=-X main.assetRoot=<path-to-installed-data/>\"."))
+		handleError(errors.New("Quetzal must be compiled with \"-ldflags=-X main.assetRoot=<path-to-installed-data/>\"."))
 	}
 }
 

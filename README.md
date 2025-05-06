@@ -1,10 +1,10 @@
-# morph
+# Quetzal
 
-[![Flake Checks](https://github.com/DBCDK/morph/actions/workflows/checks.yml/badge.svg?branch=master)](https://github.com/DBCDK/morph/actions/workflows/build.yaml)
-[![Example Configs](https://github.com/DBCDK/morph/actions/workflows/build-test.yaml/badge.svg?branch=master)](https://github.com/DBCDK/morph/actions/workflows/build.yaml)
+[![Flake Checks](https://github.com/quetzal-deploy/quetzal/actions/workflows/checks.yml/badge.svg?branch=master)](https://github.com/quetzal-deploy/quetzal/actions/workflows/build.yaml)
+[![Example Configs](https://github.com/quetzal-deploy/quetzal/actions/workflows/build-test.yaml/badge.svg?branch=master)](https://github.com/quetzal-deploy/quetzal/actions/workflows/build.yaml)
 
-Morph is a tool for managing existing NixOS hosts - basically a fancy wrapper around `nix-build`, `nix copy`, `nix-env`, `/nix/store/.../bin/switch-to-configuration`, `scp` and more.
-Morph supports updating multiple hosts in a row, and with support for health checks makes it fairly safe to do so.
+Quetzal is a tool for managing existing NixOS hosts - basically a fancy wrapper around `nix-build`, `nix copy`, `nix-env`, `/nix/store/.../bin/switch-to-configuration`, `scp` and more.
+Quetzal supports updating multiple hosts in a row, and with support for health checks makes it fairly safe to do so.
 
 
 ## Notable features
@@ -16,21 +16,21 @@ Morph supports updating multiple hosts in a row, and with support for health che
 
 ## Installation and prerequisites
 
-Morph requires `nix` (at least v2), `ssh` and `scp` to be available on `$PATH`.
+Quetzal requires `nix` (at least v2), `ssh` and `scp` to be available on `$PATH`.
 It should work on any modern Linux distribution, but NixOS is the only one we test on.
 
-Pre-built binaries are not provided, since we install morph through an overlay.
+Pre-built binaries are not provided, since we install Quetzal through an overlay.
 
-The easiest way to get morph up and running is to fork this repository and run `nix-build`, which should result in a store path containing the morph binary.
-Consider checking out a specific tag, or at least pin the version of morph you're using somehow.
+The easiest way to get Quetzal up and running is to fork this repository and run `nix-build`, which should result in a store path containing the Quetzal binary.
+Consider checking out a specific tag, or at least pin the version of Quetzal you're using somehow.
 
 
-## Using morph
+## Using Quetzal
 
-All commands support a `--help` flag; `morph --help` as of v1.0.0:
+All commands support a `--help` flag; `quetzal --help` as of v1.0.0:
 ```
-$ morph --help
-usage: morph [<flags>] <command> [<args> ...]
+$ quetzal --help
+usage: quetzal [<flags>] <command> [<args> ...]
 
 NixOS host manager
 
@@ -62,39 +62,39 @@ Commands:
     Execute arbitrary commands on machines
 ```
 
-Notably, `morph deploy` requires a `<switch-action>`.
+Notably, `quetzal deploy` requires a `<switch-action>`.
 The switch-action must be one of `dry-activate`, `test`, `switch` or `boot` corresponding to `nixos-rebuild` arguments of the same name.
 Refer to the [NixOS manual](https://nixos.org/nixos/manual/index.html#sec-changing-config) for a detailed description of switch-actions.
 
-For help on this and other commands, run `morph <cmd> --help`.
+For help on this and other commands, run `quetzal <cmd> --help`.
 
 Example deployments can be found in the `examples` directory, and built as follows:
 ```
-$ morph build examples/simple.nix
+$ quetzal build examples/simple.nix
 Selected 2/2 hosts (name filter:-0, limits:-0):
 	  0: db01 (secrets: 0, health checks: 0)
 	  1: web01 (secrets: 0, health checks: 0)
 
 <probably lots of nix-build output>
 
-/nix/store/grvny5ga2i6jdxjjbh2ipdz7h50swi1n-morph
+/nix/store/grvny5ga2i6jdxjjbh2ipdz7h50swi1n-quetzal
 nix result path:
-/nix/store/grvny5ga2i6jdxjjbh2ipdz7h50swi1n-morph
+/nix/store/grvny5ga2i6jdxjjbh2ipdz7h50swi1n-quetzal
 ```
 
 The result path is written twice, which is a bit silly, but the reason is that only the result path is written to stdout, and everything else (including `nix-build` output) is redirected to stderr.
-This makes it easy to use morph for scripting, e.g. if one want to build using morph and then `nix copy` the result path somewhere else.
+This makes it easy to use Quetzal for scripting, e.g. if one want to build using Quetzal and then `nix copy` the result path somewhere else.
 
 Note that `examples/simple.nix` contain two different hosts definitions, and a lot of copy paste.
 All the usual nix tricks can of course be used to avoid duplication.
 
 Hosts can be deployed with the `deploy` command as follows:
-`morph deploy examples/simple.nix` (this will fail without modifying `examples/simple.nix`).
+`quetzal deploy examples/simple.nix` (this will fail without modifying `examples/simple.nix`).
 
 
 ### Selecting/filtering hosts to build and deploy
 
-All hosts defined in a deployment file is returned to morph as a list of hosts, which can be manipulated with the following flags:
+All hosts defined in a deployment file is returned to Quetzal as a list of hosts, which can be manipulated with the following flags:
 
 - `--on glob` can be used to select hosts by name, with support for glob patterns
 - `--limit n` puts an upper limit on the number of hosts
@@ -129,16 +129,16 @@ To sort hosts based on tags, use the `network.ordering.tags` option, e.g. `netwo
 
 ### Environment Variables
 
-Morph supports the following (optional) environment variables:
+Quetzal supports the following (optional) environment variables:
 
 - `SSH_IDENTITY_FILE` the (local) path to the SSH private key file that should be used
 - `SSH_USER` specifies the user that should be used to connect to the remote system
 - `SSH_SKIP_HOST_KEY_CHECK` if set disables host key verification
 - `SSH_CONFIG_FILE` allows to change the location of the ~/.ssh/config file
-- `MORPH_NIX_EVAL_CMD` morph will invoke this command instead of default: "nix-instantiate" on PATH 
-- `MORPH_NIX_BUILD_CMD` morph will invoke this command instead of default: "nix-build" on PATH 
-- `MORPH_NIX_SHELL_CMD` morph will invoke this command instead of default: "nix-shell" on PATH
-- `MORPH_NIX_EVAL_MACHINES` path to a custom eval-machines.nix. Defaults to the eval-machines.nix bundled with morph
+- `QUETZAL_NIX_EVAL_CMD` Quetzal will invoke this command instead of default: "nix-instantiate" on PATH 
+- `QUETZAL_NIX_BUILD_CMD` Quetzal will invoke this command instead of default: "nix-build" on PATH 
+- `QUETZAL_NIX_SHELL_CMD` Quetzal will invoke this command instead of default: "nix-shell" on PATH
+- `QUETZAL_NIX_EVAL_MACHINES` path to a custom eval-machines.nix. Defaults to the eval-machines.nix bundled with Quetzal
 
 ### Secrets
 
@@ -146,20 +146,20 @@ Files can be uploaded without ever ending up in the nix store, by specifying eac
 
 See `examples/secrets.nix` or the type definitions in `data/options.nix`.
 
-To upload secrets, use the `morph upload-secrets` subcommand, or pass `--upload-secrets` to `morph deploy`.
+To upload secrets, use the `quetzal upload-secrets` subcommand, or pass `--upload-secrets` to `quetzal deploy`.
 
 *Note:*
-Morph will automatically create directories parent to `secret.Destination` if they don't exist.
+Quetzal will automatically create directories parent to `secret.Destination` if they don't exist.
 New dirs will be owned by root:root and have mode 755 (drwxr-xr-x).
 Automatic directory creation can be disabled by setting `secret.mkDirs = false`.
 
 
 ### Health checks
 
-Morph has support for two types of health checks:
+Quetzal has support for two types of health checks:
 
 * command based health checks, which are run on the target host (success defined as exit code == 0)
-* HTTP based health checks, which are run from the host Morph is running on (success defined as HTTP response codes in the 2xx range)
+* HTTP based health checks, which are run from the host Quetzal is running on (success defined as HTTP response codes in the 2xx range)
 
 See `examples/healthchecks.nix` for an example.
 
@@ -171,7 +171,7 @@ It is currently possible to have expressions like `"test \"$(systemctl list-unit
 
 ### Pre-deploy checks (experimental)
 
-Morph supports running checks before changing the target host (note: files will still be pushed to the host).
+Quetzal supports running checks before changing the target host (note: files will still be pushed to the host).
 These checks work exactly like health checks, which means they will run forever until they have all succeeded.
 This is an _experimental feature that is very likely to change_ in the future. Comments and feedback welcome :).
 
@@ -185,13 +185,13 @@ Note: these options apply to an entire deployment and are *not* configurable on 
 The default is an empty set, meaning that the nix configuration is inherited from the build environment. See `man nix.conf`.
 
 **network.buildShell**
-By passing `--allow-build-shell` and setting `network.buildShell` to a nix-shell compatible derivation (eg. `pkgs.mkShell ...`), it's possible to make morph execute builds from within the defined shell. This makes it possible to have arbitrary dependencies available during the build, say for use with nix build hooks. Be aware that the shell can potentially execute any command on the local system.
+By passing `--allow-build-shell` and setting `network.buildShell` to a nix-shell compatible derivation (eg. `pkgs.mkShell ...`), it's possible to make Quetzal execute builds from within the defined shell. This makes it possible to have arbitrary dependencies available during the build, say for use with nix build hooks. Be aware that the shell can potentially execute any command on the local system.
 
 **special deployment options:**
 
 (per-host granularity)
 
-`buildOnly` makes morph skip the "push" and "switch" steps for the given host, even if "morph deploy" or "morph push" is executed. (default: false)
+`buildOnly` makes Quetzal skip the "push" and "switch" steps for the given host, even if "quetzal deploy" or "quetzal push" is executed. (default: false)
 
 `substituteOnDestination` Sets the `--substitute-on-destination` flag on nix copy, allowing for the deployment target to use substitutes. See `nix copy --help`. (default: false)
 
@@ -241,7 +241,7 @@ machine2 = { nodes, ... }: {
 ```
 
 
-## Hacking morph
+## Hacking Quetzal
 
 All commands mentioned below is available in the nix-shell, if you run `nix-shell` with working dir = project root. The included `shell.nix` uses the latest `nixos-unstable` from GitHub by default, but you can override this by passing in another, eg. `nix-shell --arg nixpkgs '<nixpkgs>'` for your `$NIX_PATH` nixpkgs.
 
@@ -257,6 +257,6 @@ $ `nix-build --arg nixpkgs "builtins.fetchTarball https://github.com/NixOS/nixpk
 
 We needed a tool for managing our NixOS servers, and ended up writing one ourself. This is it. We use it on a daily basis to build and deploy our NixOS fleet, and when we need a feature we add it.
 
-Morph is by no means done. The CLI UI might (and probably will) change once in a while.
+Quetzal is by no means done. The CLI UI might (and probably will) change once in a while.
 The code is written by humans with an itch to scratch, and we're discussing a complete rewrite (so feel free to complain about the source code since we don't like it either).
 It probably wont accidentally switch your local machine, so you should totally try it out, but do consider pinning to a specific git revision.

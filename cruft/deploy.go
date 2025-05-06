@@ -7,15 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/filter"
-	"github.com/DBCDK/morph/healthchecks"
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/ssh"
-	"github.com/DBCDK/morph/utils"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/filter"
+	"github.com/quetzal-deploy/quetzal/healthchecks"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/ssh"
+	"github.com/quetzal-deploy/quetzal/utils"
 )
 
-func ExecBuild(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
+func ExecBuild(opts *common.QuetzalOptions, hosts []nix.Host) (string, error) {
 	resultPath, err := buildHosts(opts, hosts)
 	if err != nil {
 		return "", err
@@ -23,7 +23,7 @@ func ExecBuild(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 	return resultPath, nil
 }
 
-func ExecDeploy(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
+func ExecDeploy(opts *common.QuetzalOptions, hosts []nix.Host) (string, error) {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	doPush := false
@@ -128,7 +128,7 @@ func ExecDeploy(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 	return resultPath, nil
 }
 
-func ExecEval(opts *common.MorphOptions) (string, error) {
+func ExecEval(opts *common.QuetzalOptions) (string, error) {
 	deploymentFile, err := os.Open(opts.Deployment)
 	deploymentPath, err := filepath.Abs(deploymentFile.Name())
 	if err != nil {
@@ -140,7 +140,7 @@ func ExecEval(opts *common.MorphOptions) (string, error) {
 	return path, err
 }
 
-func ExecExecute(opts *common.MorphOptions, hosts []nix.Host) error {
+func ExecExecute(opts *common.QuetzalOptions, hosts []nix.Host) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	for _, host := range hosts {
@@ -156,7 +156,7 @@ func ExecExecute(opts *common.MorphOptions, hosts []nix.Host) error {
 	return nil
 }
 
-func ExecHealthCheck(opts *common.MorphOptions, hosts []nix.Host) error {
+func ExecHealthCheck(opts *common.QuetzalOptions, hosts []nix.Host) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	var err error
@@ -175,7 +175,7 @@ func ExecHealthCheck(opts *common.MorphOptions, hosts []nix.Host) error {
 	return err
 }
 
-func ExecPush(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
+func ExecPush(opts *common.QuetzalOptions, hosts []nix.Host) (string, error) {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	resultPath, err := ExecBuild(opts, hosts)
@@ -187,7 +187,7 @@ func ExecPush(opts *common.MorphOptions, hosts []nix.Host) (string, error) {
 	return resultPath, pushPaths(sshContext, hosts, resultPath)
 }
 
-func GetHosts(opts *common.MorphOptions) (hosts []nix.Host, err error) {
+func GetHosts(opts *common.QuetzalOptions) (hosts []nix.Host, err error) {
 	deploymentFile, err := os.Open(opts.Deployment)
 	if err != nil {
 		return hosts, err
@@ -234,7 +234,7 @@ func GetHosts(opts *common.MorphOptions) (hosts []nix.Host, err error) {
 	return filteredHosts, nil
 }
 
-func activateConfiguration(opts *common.MorphOptions, filteredHosts []nix.Host, resultPath string) error {
+func activateConfiguration(opts *common.QuetzalOptions, filteredHosts []nix.Host, resultPath string) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	fmt.Fprintln(os.Stderr, "Executing '"+opts.DeploySwitchAction+"' on matched hosts:")
@@ -259,7 +259,7 @@ func activateConfiguration(opts *common.MorphOptions, filteredHosts []nix.Host, 
 	return nil
 }
 
-func buildHosts(opts *common.MorphOptions, hosts []nix.Host) (resultPath string, err error) {
+func buildHosts(opts *common.QuetzalOptions, hosts []nix.Host) (resultPath string, err error) {
 	if len(hosts) == 0 {
 		err = errors.New("No hosts selected")
 		return

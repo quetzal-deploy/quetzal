@@ -172,7 +172,7 @@ rec {
       fileArgs = builtins.fromJSON (builtins.readFile argsFile);
       nodes' = filterAttrs (n: _v: elem n fileArgs.Names) nodes;
     in
-    runCommand "morph" { preferLocalBuild = true; } (
+    runCommand "quetzal" { preferLocalBuild = true; } (
       if buildTargets == null then
         ''
           mkdir -p $out

@@ -1,6 +1,6 @@
 package common
 
-type MorphOptions struct {
+type QuetzalOptions struct {
 	Version   string
 	AssetRoot string
 

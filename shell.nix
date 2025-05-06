@@ -4,7 +4,7 @@
 }:
 
 let
-  morph = pkgs.callPackage ./default.nix { };
+  quetzal = pkgs.callPackage ./default.nix { };
 
 in
-pkgs.mkShell { inputsFrom = [ morph ]; }
+pkgs.mkShell { inputsFrom = [ quetzal ]; }

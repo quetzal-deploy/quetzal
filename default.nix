@@ -5,7 +5,7 @@
 }:
 
 pkgs.buildGoModule rec {
-  name = "morph-unstable-${version}";
+  name = "quetzal-unstable-${version}";
   inherit version;
 
   src = pkgs.nix-gitignore.gitignoreSource [ ] ./.;
@@ -22,9 +22,9 @@ pkgs.buildGoModule rec {
   postInstall = ''
     mkdir -p $lib
     cp -v ./data/*.nix $lib
-    installShellCompletion --cmd morph \
-      --bash <($out/bin/morph --completion-script-bash) \
-      --zsh <($out/bin/morph --completion-script-zsh)
+    installShellCompletion --cmd quetzal \
+      --bash <($out/bin/quetzal --completion-script-bash) \
+      --zsh <($out/bin/quetzal --completion-script-zsh)
   '';
 
   outputs = [
@@ -33,8 +33,8 @@ pkgs.buildGoModule rec {
   ];
 
   meta = {
-    homepage = "https://github.com/DBCDK/morph";
-    description = "Morph is a NixOS host manager written in Golang.";
-    mainProgram = "morph";
+    homepage = "https://github.com/quetzal-deploy/deploy";
+    description = "Quetzal is a NixOS host manager written in Golang.";
+    mainProgram = "quetzal";
   };
 }

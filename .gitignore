@@ -4,7 +4,7 @@
 .idea
 
 # Default binary output file name
-/morph
+/quetzal
 
 # vendor cache dir
 /vendor

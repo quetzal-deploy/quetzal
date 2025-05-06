@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/utils"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/utils"
 )
 
 type Host interface {
@@ -36,7 +36,7 @@ type SSHContext struct {
 	SkipHostKeyCheck       bool
 }
 
-func CreateSSHContext(opts *common.MorphOptions) *SSHContext {
+func CreateSSHContext(opts *common.QuetzalOptions) *SSHContext {
 	return &SSHContext{
 		AskForSudoPassword:     opts.AskForSudoPasswd,
 		GetSudoPasswordCommand: opts.PassCmd,
