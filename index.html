@@ -12,6 +12,8 @@
       
       
       
+        <link rel="next" href="differences-from-morph/">
+      
       
       <link rel="icon" href="assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
@@ -70,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#welcome-to-mkdocs" class="md-skip">
+        <a href="#quetzal" class="md-skip">
           Skip to content
         </a>
       
@@ -82,9 +84,7 @@
     
       
 
-  
-
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="." title="Quetzal - a NixOS deployment tool" class="md-header__button md-logo" aria-label="Quetzal - a NixOS deployment tool" data-md-component="logo">
       
@@ -106,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Welcome to MkDocs
+              Quetzal
             
           </span>
         </div>
@@ -213,6 +213,68 @@
       
         
           
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
+        
+  
+    
+  
+  Quetzal
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="differences-from-morph/" class="md-tabs__link">
+        
+  
+    
+  
+  Differences from morph
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="examples/" class="md-tabs__link">
+        
+  
+    
+  
+  Deployment examples
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
         
       
       <main class="md-main" data-md-component="main">
@@ -226,8 +288,12 @@
                     
 
 
+  
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="." title="Quetzal - a NixOS deployment tool" class="md-nav__button md-logo" aria-label="Quetzal - a NixOS deployment tool" data-md-component="logo">
       
@@ -272,7 +338,7 @@
           
   
   <span class="md-ellipsis">
-    Welcome to MkDocs
+    Quetzal
   </span>
   
 
@@ -283,7 +349,7 @@
         
   
   <span class="md-ellipsis">
-    Welcome to MkDocs
+    Quetzal
   </span>
   
 
@@ -305,18 +371,144 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#commands" class="md-nav__link">
+  <a href="#notable-features" class="md-nav__link">
     <span class="md-ellipsis">
-      Commands
+      Notable features
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#project-layout" class="md-nav__link">
+  <a href="#installation-and-prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
-      Project layout
+      Installation and prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-quetzal" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Quetzal
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using Quetzal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#selectingfiltering-hosts-to-build-and-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Selecting/filtering hosts to build and deploy
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Selecting/filtering hosts to build and deploy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tagging-hosts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tagging hosts
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Environment Variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secrets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Secrets
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Health checks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-deploy-checks-experimental" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pre-deploy checks (experimental)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hacking-quetzal" class="md-nav__link">
+    <span class="md-ellipsis">
+      Hacking Quetzal
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hacking Quetzal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#go-dependency-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Go dependency management
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-the-project-with-pinned-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Building the project with pinned dependencies
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#about-the-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      About the project
     </span>
   </a>
   
@@ -330,56 +522,52 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="differences-from-morph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Differences from morph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="examples/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Deployment examples
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
                 </div>
               </div>
             
-            
-              
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
-                <div class="md-sidebar__scrollwrap">
-                  <div class="md-sidebar__inner">
-                    
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      Commands
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#project-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      Project layout
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-                  </div>
-                </div>
-              </div>
             
           
           
@@ -392,31 +580,197 @@
   
 
 
-<h1 id="welcome-to-mkdocs">Welcome to MkDocs</h1>
-<p>For full documentation visit <a href="https://www.mkdocs.org">mkdocs.org</a>.</p>
-<h2 id="commands">Commands</h2>
+<h1 id="quetzal">Quetzal</h1>
+<p><a href="https://github.com/quetzal-deploy/quetzal/actions/workflows/build.yaml"><img alt="Flake Checks" src="https://github.com/quetzal-deploy/quetzal/actions/workflows/checks.yml/badge.svg?branch=master" /></a>
+<a href="https://github.com/quetzal-deploy/quetzal/actions/workflows/build.yaml"><img alt="Example Configs" src="https://github.com/quetzal-deploy/quetzal/actions/workflows/build-test.yaml/badge.svg?branch=master" /></a></p>
+<p>Quetzal is a tool for managing existing NixOS hosts - basically a fancy wrapper around <code>nix-build</code>, <code>nix copy</code>, <code>nix-env</code>, <code>/nix/store/.../bin/switch-to-configuration</code>, <code>scp</code> and more.
+Quetzal supports updating multiple hosts in a row, and with support for health checks makes it fairly safe to do so.</p>
+<h2 id="notable-features">Notable features</h2>
 <ul>
-<li><code>mkdocs new [dir-name]</code> - Create a new project.</li>
-<li><code>mkdocs serve</code> - Start the live-reloading docs server.</li>
-<li><code>mkdocs build</code> - Build the documentation site.</li>
-<li><code>mkdocs -h</code> - Print help message and exit.</li>
+<li>multi host support</li>
+<li>health checks</li>
+<li>no state</li>
 </ul>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">}</span>
+<h2 id="installation-and-prerequisites">Installation and prerequisites</h2>
+<p>Quetzal requires <code>nix</code> (at least v2), <code>ssh</code> and <code>scp</code> to be available on <code>$PATH</code>.
+It should work on any modern Linux distribution, but NixOS is the only one we test on.</p>
+<p>Pre-built binaries are not provided, since we install Quetzal through an overlay.</p>
+<p>The easiest way to get Quetzal up and running is to fork this repository and run <code>nix-build</code>, which should result in a store path containing the Quetzal binary.
+Consider checking out a specific tag, or at least pin the version of Quetzal you're using somehow.</p>
+<h2 id="using-quetzal">Using Quetzal</h2>
+<p>All commands support a <code>--help</code> flag; <code>quetzal --help</code> as of v1.0.0:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ quetzal --help
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>usage: quetzal [&lt;flags&gt;] &lt;command&gt; [&lt;args&gt; ...]
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>NixOS host manager
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>Flags:
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  --help     Show context-sensitive help (also try --help-long and --help-man).
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  --version  Show application version.
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  --dry-run  Don&#39;t do anything, just eval and print changes
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>Commands:
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  help [&lt;command&gt;...]
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    Show help.
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  build [&lt;flags&gt;] &lt;deployment&gt;
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    Evaluate and build deployment configuration to the local Nix store
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  push [&lt;flags&gt;] &lt;deployment&gt;
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    Build and transfer items from the local Nix store to target machines
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>  deploy [&lt;flags&gt;] &lt;deployment&gt; &lt;switch-action&gt;
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    Build, push and activate new configuration on machines according to switch-action
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>  check-health [&lt;flags&gt;] &lt;deployment&gt;
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    Run health checks
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  upload-secrets [&lt;flags&gt;] &lt;deployment&gt;
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    Upload secrets
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>  exec [&lt;flags&gt;] &lt;deployment&gt; &lt;command&gt;...
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>    Execute arbitrary commands on machines
+</span></code></pre></div></p>
+<p>Notably, <code>quetzal deploy</code> requires a <code>&lt;switch-action&gt;</code>.
+The switch-action must be one of <code>dry-activate</code>, <code>test</code>, <code>switch</code> or <code>boot</code> corresponding to <code>nixos-rebuild</code> arguments of the same name.
+Refer to the <a href="https://nixos.org/nixos/manual/index.html#sec-changing-config">NixOS manual</a> for a detailed description of switch-actions.</p>
+<p>For help on this and other commands, run <code>quetzal &lt;cmd&gt; --help</code>.</p>
+<p>Example deployments can be found in the <code>examples</code> directory, and built as follows:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$ quetzal build examples/simple.nix
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Selected 2/2 hosts (name filter:-0, limits:-0):
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>      0: db01 (secrets: 0, health checks: 0)
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>      1: web01 (secrets: 0, health checks: 0)
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>&lt;probably lots of nix-build output&gt;
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>/nix/store/grvny5ga2i6jdxjjbh2ipdz7h50swi1n-quetzal
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>nix result path:
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>/nix/store/grvny5ga2i6jdxjjbh2ipdz7h50swi1n-quetzal
+</span></code></pre></div></p>
+<p>The result path is written twice, which is a bit silly, but the reason is that only the result path is written to stdout, and everything else (including <code>nix-build</code> output) is redirected to stderr.
+This makes it easy to use Quetzal for scripting, e.g. if one want to build using Quetzal and then <code>nix copy</code> the result path somewhere else.</p>
+<p>Note that <code>examples/simple.nix</code> contain two different hosts definitions, and a lot of copy paste.
+All the usual nix tricks can of course be used to avoid duplication.</p>
+<p>Hosts can be deployed with the <code>deploy</code> command as follows:
+<code>quetzal deploy examples/simple.nix</code> (this will fail without modifying <code>examples/simple.nix</code>).</p>
+<h3 id="selectingfiltering-hosts-to-build-and-deploy">Selecting/filtering hosts to build and deploy</h3>
+<p>All hosts defined in a deployment file is returned to Quetzal as a list of hosts, which can be manipulated with the following flags:</p>
+<ul>
+<li><code>--on glob</code> can be used to select hosts by name, with support for glob patterns</li>
+<li><code>--limit n</code> puts an upper limit on the number of hosts</li>
+<li><code>--skip n</code> ignore the first <code>n</code> hosts</li>
+<li><code>--every n</code> selects every n'th host, useful for e.g. selecting all even (or odd) numbered hosts</li>
+</ul>
+<p>(all relevant commands should already support these flags.)</p>
+<p>The ordering currently can't be changed, but should be deterministic because of nix.</p>
+<p>Most commands output a header like this:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Selected 4/17 hosts (name filter:-6, limits:-7):
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>      0: foo-p02 (secrets: 0, health checks: 1)
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>      1: foo-p05 (secrets: 0, health checks: 1)
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>      2: foo-p08 (secrets: 0, health checks: 1)
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>      3: foo-p11 (secrets: 0, health checks: 1)
+</span></code></pre></div></p>
+<p>The output is pretty self explanatory, except probably for the last bit of the first line.
+<code>name filter</code> shows the change in number of hosts after glob matching on the hosts name, and <code>limits</code> shows the change after applying <code>--limit</code>, <code>--skip</code> and <code>--every</code>.</p>
+<h4 id="tagging-hosts">Tagging hosts</h4>
+<p>Each host can be tagged with an arbitrary amount of tags, which can be used to select and sort hosts.</p>
+<p>To tag a host, use the <code>deployment.tags</code> option, e.g. <code>deployment.tags = [ "prod" "master" "rack-17" ]</code>. Hosts can now be selected with the <code>--tagged</code> option, e.g.<code>--tagged="prod,master"</code> will only select hosts tagged <em>both</em> <code>prod</code> <em>and</em> <code>master</code>.</p>
+<p>To sort hosts based on tags, use the <code>network.ordering.tags</code> option, e.g. <code>network.ordering.tags = [ "master" "slave"]</code>. This ordering can be changed at runtime using the <code>--order-by-tags</code> option, eg. <code>--order-by-tags="slave,master"</code> (this also works when <code>network.ordering.tags</code> isn't defined). Hosts without matching tags will end up at the end of the list.</p>
+<h3 id="environment-variables">Environment Variables</h3>
+<p>Quetzal supports the following (optional) environment variables:</p>
+<ul>
+<li><code>SSH_IDENTITY_FILE</code> the (local) path to the SSH private key file that should be used</li>
+<li><code>SSH_USER</code> specifies the user that should be used to connect to the remote system</li>
+<li><code>SSH_SKIP_HOST_KEY_CHECK</code> if set disables host key verification</li>
+<li><code>SSH_CONFIG_FILE</code> allows to change the location of the ~/.ssh/config file</li>
+<li><code>QUETZAL_NIX_EVAL_CMD</code> Quetzal will invoke this command instead of default: "nix-instantiate" on PATH </li>
+<li><code>QUETZAL_NIX_BUILD_CMD</code> Quetzal will invoke this command instead of default: "nix-build" on PATH </li>
+<li><code>QUETZAL_NIX_SHELL_CMD</code> Quetzal will invoke this command instead of default: "nix-shell" on PATH</li>
+<li><code>QUETZAL_NIX_EVAL_MACHINES</code> path to a custom eval-machines.nix. Defaults to the eval-machines.nix bundled with Quetzal</li>
+</ul>
+<h3 id="secrets">Secrets</h3>
+<p>Files can be uploaded without ever ending up in the nix store, by specifying each file as a secret. This will use scp for copying a local file to the remote host.</p>
+<p>See <code>examples/secrets.nix</code> or the type definitions in <code>data/options.nix</code>.</p>
+<p>To upload secrets, use the <code>quetzal upload-secrets</code> subcommand, or pass <code>--upload-secrets</code> to <code>quetzal deploy</code>.</p>
+<p><em>Note:</em>
+Quetzal will automatically create directories parent to <code>secret.Destination</code> if they don't exist.
+New dirs will be owned by root:root and have mode 755 (drwxr-xr-x).
+Automatic directory creation can be disabled by setting <code>secret.mkDirs = false</code>.</p>
+<h3 id="health-checks">Health checks</h3>
+<p>Quetzal has support for two types of health checks:</p>
+<ul>
+<li>command based health checks, which are run on the target host (success defined as exit code == 0)</li>
+<li>HTTP based health checks, which are run from the host Quetzal is running on (success defined as HTTP response codes in the 2xx range)</li>
+</ul>
+<p>See <code>examples/healthchecks.nix</code> for an example.</p>
+<p>There are no guarantees about the order health checks are run in, so if you need something complex you should write a script for it (e.g. using <code>pkgs.writeScript</code>).
+Health checks will be repeated until success, and the interval can be configured with the <code>period</code> option (see <code>data/options.nix</code> for details).</p>
+<p>It is currently possible to have expressions like <code>"test \"$(systemctl list-units --failed --no-legend --no-pager |wc -l)\" -eq 0"</code> (count number of failed systemd units, fail if non-zero) as the first argument in a cmd-healthcheck. This works, but is discouraged, and might break at any time.</p>
+<h3 id="pre-deploy-checks-experimental">Pre-deploy checks (experimental)</h3>
+<p>Quetzal supports running checks before changing the target host (note: files will still be pushed to the host).
+These checks work exactly like health checks, which means they will run forever until they have all succeeded.
+This is an <em>experimental feature that is very likely to change</em> in the future. Comments and feedback welcome :).</p>
+<p>Pre-deploy checks can be defined using <code>deployment.preDeployChecks</code>.</p>
+<h3 id="advanced-configuration">Advanced configuration</h3>
+<p><strong>nix.conf-options:</strong> The "network"-attrset supports a sub-attrset named "nixConfig". Options configured here will pass <code>--option &lt;name&gt; &lt;value&gt;</code> to all nix commands.
+Note: these options apply to an entire deployment and are <em>not</em> configurable on per-host basis.
+The default is an empty set, meaning that the nix configuration is inherited from the build environment. See <code>man nix.conf</code>.</p>
+<p><strong>network.buildShell</strong>
+By passing <code>--allow-build-shell</code> and setting <code>network.buildShell</code> to a nix-shell compatible derivation (eg. <code>pkgs.mkShell ...</code>), it's possible to make Quetzal execute builds from within the defined shell. This makes it possible to have arbitrary dependencies available during the build, say for use with nix build hooks. Be aware that the shell can potentially execute any command on the local system.</p>
+<p><strong>special deployment options:</strong></p>
+<p>(per-host granularity)</p>
+<p><code>buildOnly</code> makes Quetzal skip the "push" and "switch" steps for the given host, even if "quetzal deploy" or "quetzal push" is executed. (default: false)</p>
+<p><code>substituteOnDestination</code> Sets the <code>--substitute-on-destination</code> flag on nix copy, allowing for the deployment target to use substitutes. See <code>nix copy --help</code>. (default: false)</p>
+<p>Example usage of <code>nixConfig</code> and deployment module options:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>network = {
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    nixConfig = {
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        &quot;extra-sandbox-paths&quot; = &quot;/foo/bar&quot;;
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    };
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>};
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>machine1 = { ... }: {
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    deployment.buildOnly = true;
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>};
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>machine2 = { ... }: {
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    deployment.substituteOnDestination = true;
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>};
+</span></code></pre></div></p>
+<p><strong>mutually recursive configurations</strong>
+Each host's configuration has access to a <code>nodes</code> argument, which contains the compiled configurations of all hosts.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>machine1 = { nodes, ... }: {
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    hostnames.machine2 = 
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>        (builtins.head nodes.machine2.networking.interfaces.foo.ipv4.addresses).address;
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    networking.interfaces.foo.ipv4.addresses = [
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        {
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>            address = &quot;10.0.0.10&quot;;
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>            prefixLength = 32;
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        }
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    ];
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>}
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>machine2 = { nodes, ... }: {
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    hostnames.machine1 = 
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        (builtins.head nodes.machine1.networking.interfaces.foo.ipv4.addresses).address;
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    networking.interfaces.foo.ipv4.addresses = [
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>        {
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>            address = &quot;10.0.0.20&quot;;
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>            prefixLength = 32;
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>        }
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    ];
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>}
 </span></code></pre></div>
-<pre class="mermaid"><code>graph LR
-  A[Start] --&gt; B{Error?};
-  B --&gt;|Yes| C[Hmm...];
-  C --&gt; D[Debug];
-  D --&gt; B;
-  B ----&gt;|No| E[Yay!];</code></pre>
-<h2 id="project-layout">Project layout</h2>
-<div class="language-text highlight"><pre><span></span><code>mkdocs.yml    # The configuration file.
-docs/
-    index.md  # The documentation homepage.
-    ...       # Other markdown pages, images and other files.
-</code></pre></div>
+<h2 id="hacking-quetzal">Hacking Quetzal</h2>
+<p>All commands mentioned below is available in the nix-shell, if you run <code>nix-shell</code> with working dir = project root. The included <code>shell.nix</code> uses the latest <code>nixos-unstable</code> from GitHub by default, but you can override this by passing in another, eg. <code>nix-shell --arg nixpkgs '&lt;nixpkgs&gt;'</code> for your <code>$NIX_PATH</code> nixpkgs.</p>
+<h3 id="go-dependency-management">Go dependency management</h3>
+<p>From within <code>nix-shell</code>, <code>go get -u</code> updates all go modules. Remember to update the <code>vendorSha256</code> in <code>./default.nix</code></p>
+<h3 id="building-the-project-with-pinned-dependencies">Building the project with pinned dependencies</h3>
+<p>$ <code>nix-build --arg nixpkgs "builtins.fetchTarball https://github.com/NixOS/nixpkgs/archive/&lt;rev&gt;.tar.gz"</code></p>
+<h2 id="about-the-project">About the project</h2>
+<p>We needed a tool for managing our NixOS servers, and ended up writing one ourself. This is it. We use it on a daily basis to build and deploy our NixOS fleet, and when we need a feature we add it.</p>
+<p>Quetzal is by no means done. The CLI UI might (and probably will) change once in a while.
+The code is written by humans with an itch to scratch, and we're discussing a complete rewrite (so feel free to complain about the source code since we don't like it either).
+It probably wont accidentally switch your local machine, so you should totally try it out, but do consider pinning to a specific git revision.</p>
 
 
 
@@ -442,6 +796,28 @@ docs/
         <footer class="md-footer">
   
     
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+        
+          
+          <a href="differences-from-morph/" class="md-footer__link md-footer__link--next" aria-label="Next: Differences from morph">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Differences from morph
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
@@ -465,7 +841,7 @@ docs/
     </div>
     
     
-    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.footer"], "search": "assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.tabs", "navigation.footer", "toc.integrate"], "search": "assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="assets/javascripts/bundle.525ec568.min.js"></script>
