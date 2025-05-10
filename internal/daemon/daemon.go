@@ -6,9 +6,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/quetzal-deploy/quetzal/common"
-	"github.com/quetzal-deploy/quetzal/cruft"
-	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/internal/common"
+	"github.com/quetzal-deploy/quetzal/internal/cruft"
+	"github.com/quetzal-deploy/quetzal/internal/nix"
 )
 
 type Daemon struct {

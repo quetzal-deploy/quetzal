@@ -8,9 +8,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/quetzal-deploy/quetzal/events"
 	"github.com/quetzal-deploy/quetzal/internal/daemon"
-	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/internal/events"
+	"github.com/quetzal-deploy/quetzal/internal/nix"
 )
 
 var (

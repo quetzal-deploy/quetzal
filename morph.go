@@ -19,18 +19,18 @@ import (
 
 	"github.com/DBCDK/kingpin"
 
-	"github.com/quetzal-deploy/quetzal/cliparser"
-	"github.com/quetzal-deploy/quetzal/common"
-	"github.com/quetzal-deploy/quetzal/cruft"
-	"github.com/quetzal-deploy/quetzal/events"
+	"github.com/quetzal-deploy/quetzal/internal/cliparser"
+	"github.com/quetzal-deploy/quetzal/internal/common"
 	"github.com/quetzal-deploy/quetzal/internal/constraints"
+	"github.com/quetzal-deploy/quetzal/internal/cruft"
 	"github.com/quetzal-deploy/quetzal/internal/daemon"
+	"github.com/quetzal-deploy/quetzal/internal/events"
 	"github.com/quetzal-deploy/quetzal/internal/http"
-	"github.com/quetzal-deploy/quetzal/nix"
-	"github.com/quetzal-deploy/quetzal/planner"
-	"github.com/quetzal-deploy/quetzal/steps"
-	"github.com/quetzal-deploy/quetzal/ui"
-	"github.com/quetzal-deploy/quetzal/utils"
+	"github.com/quetzal-deploy/quetzal/internal/nix"
+	"github.com/quetzal-deploy/quetzal/internal/planner"
+	"github.com/quetzal-deploy/quetzal/internal/steps"
+	"github.com/quetzal-deploy/quetzal/internal/ui"
+	"github.com/quetzal-deploy/quetzal/internal/utils"
 )
 
 // These are set at build time via -ldflags magic
