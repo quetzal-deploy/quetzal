@@ -16,13 +16,13 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/healthchecks"
-	"github.com/DBCDK/morph/internal/constraints"
-	"github.com/DBCDK/morph/logging"
-	"github.com/DBCDK/morph/secrets"
-	"github.com/DBCDK/morph/ssh"
-	"github.com/DBCDK/morph/utils"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/healthchecks"
+	"github.com/quetzal-deploy/quetzal/internal/constraints"
+	"github.com/quetzal-deploy/quetzal/logging"
+	"github.com/quetzal-deploy/quetzal/secrets"
+	"github.com/quetzal-deploy/quetzal/ssh"
+	"github.com/quetzal-deploy/quetzal/utils"
 )
 
 type Host struct {
@@ -249,7 +249,7 @@ func GetBuildShell(nixOptions *common.NixOptions, deploymentPath string) (buildS
 		}
 	})
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("MORPH_ARGS=%s", jsonArgs))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("QUETZAL_ARGS=%s", jsonArgs))
 	err = cmd.Run()
 	if err != nil {
 		errorMessage := fmt.Sprintf(
@@ -266,7 +266,7 @@ func GetBuildShell(nixOptions *common.NixOptions, deploymentPath string) (buildS
 	return buildShell, nil
 }
 
-func EvalHosts(opts *common.MorphOptions, deploymentPath string) (string, error) {
+func EvalHosts(opts *common.QuetzalOptions, deploymentPath string) (string, error) {
 	nixOptions := opts.NixOptions()
 
 	attribute := "nodes." + opts.AttrKey
@@ -295,7 +295,7 @@ func EvalHosts(opts *common.MorphOptions, deploymentPath string) (string, error)
 	logging.LogCmd("localhost", cmd)
 
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("MORPH_ARGS=%s", jsonArgs))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("QUETZAL_ARGS=%s", jsonArgs))
 	err = cmd.Run()
 	return deploymentPath, err
 }
@@ -327,7 +327,7 @@ func GetMachines(nixOptions *common.NixOptions, deploymentPath string) (deployme
 		}
 	})
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("MORPH_ARGS=%s", jsonArgs))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("QUETZAL_ARGS=%s", jsonArgs))
 	err = cmd.Run()
 	if err != nil {
 		errorMessage := fmt.Sprintf(
@@ -344,10 +344,10 @@ func GetMachines(nixOptions *common.NixOptions, deploymentPath string) (deployme
 	return deployment, nil
 }
 
-func BuildMachines(opts *common.MorphOptions, hosts []Host, nixBuildTargets string) (resultPath string, err error) {
+func BuildMachines(opts *common.QuetzalOptions, hosts []Host, nixBuildTargets string) (resultPath string, err error) {
 	nixOptions := opts.NixOptions()
 
-	tmpdir, err := ioutil.TempDir("", "morph-")
+	tmpdir, err := ioutil.TempDir("", "quetzal-")
 	if err != nil {
 		return "", err
 	}
@@ -386,7 +386,7 @@ func BuildMachines(opts *common.MorphOptions, hosts []Host, nixBuildTargets stri
 		return resultPath, errors.New(errorMessage)
 	}
 
-	argsFile := tmpdir + "/morph-args.json"
+	argsFile := tmpdir + "/quetzal-args.json"
 	NixBuildInvocationArgs := NixBuildInvocationArgs{
 		ArgsFile:        argsFile,
 		Attr:            "machines",
@@ -424,8 +424,8 @@ func BuildMachines(opts *common.MorphOptions, hosts []Host, nixBuildTargets stri
 	})
 
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("MORPH_ARGS=%s", jsonArgs))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("MORPH_ARGS_FILE=%s", argsFile))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("QUETZAL_ARGS=%s", jsonArgs))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("QUETZAL_ARGS_FILE=%s", argsFile))
 
 	logging.LogCmd("localhost", cmd)
 	err = cmd.Run()

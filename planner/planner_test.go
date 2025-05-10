@@ -9,11 +9,11 @@ import (
 
 	"github.com/kr/pretty"
 
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/events"
-	"github.com/DBCDK/morph/internal/constraints"
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/steps"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/events"
+	"github.com/quetzal-deploy/quetzal/internal/constraints"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/steps"
 )
 
 func TestSolverGetNumeralId(t *testing.T) {
@@ -83,7 +83,7 @@ func TestWeightsOfOnes(t *testing.T) {
 
 func TestCanStartStepCardinality1(t *testing.T) {
 	hosts := make(map[string]nix.Host)
-	opts := common.MorphOptions{}
+	opts := common.QuetzalOptions{}
 
 	label1Key := "type"
 	label1Value := "web"
@@ -112,7 +112,7 @@ func TestCanStartStepCardinality1(t *testing.T) {
 
 func TestCanStartStepCardinality2(t *testing.T) {
 	hosts := make(map[string]nix.Host)
-	opts := common.MorphOptions{}
+	opts := common.QuetzalOptions{}
 
 	label1Key := "type"
 	label1Value := "web"
@@ -210,7 +210,7 @@ func TestCanStartStepCardinality2copy(t *testing.T) {
 	fmt.Println("TestCanStartStepCardinality2copy")
 
 	hosts := make(map[string]nix.Host)
-	opts := common.MorphOptions{}
+	opts := common.QuetzalOptions{}
 
 	label1Key := "type"
 	label1Value := "web"
@@ -353,7 +353,7 @@ func TestCanStartStepCardinality2copyNested(t *testing.T) {
 	fmt.Println("TestCanStartStepCardinality2copyNested")
 
 	hosts := make(map[string]nix.Host)
-	opts := common.MorphOptions{}
+	opts := common.QuetzalOptions{}
 
 	label1Key := "type"
 	label1Value := "web"
@@ -524,7 +524,7 @@ func TestRun(t *testing.T) {
 	fmt.Println("TestRun")
 
 	hosts := make(map[string]nix.Host)
-	opts := common.MorphOptions{}
+	opts := common.QuetzalOptions{}
 
 	constraints_ := make([]constraints.Constraint, 0)
 	constraints_ = append(constraints_, constraints.NewConstraint(constraints.LabelSelector{Label: "_", Value: "host"}, 100))

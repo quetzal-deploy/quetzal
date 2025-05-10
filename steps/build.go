@@ -10,10 +10,10 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/DBCDK/morph/cache"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/cruft"
-	"github.com/DBCDK/morph/nix"
+	"github.com/quetzal-deploy/quetzal/cache"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/cruft"
+	"github.com/quetzal-deploy/quetzal/nix"
 )
 
 type Build struct {
@@ -53,13 +53,13 @@ func filterHosts(needles []string, allHosts map[string]nix.Host) ([]nix.Host, er
 	return result, nil
 }
 
-func (build *Build) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (build *Build) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	hosts, err := filterHosts(build.Hosts, allHosts)
 	if err != nil {
 		return err
 	}
 
-	// FIXME: Build errors does not bubble up correctly (try setting `services.haproxy.enable = true;`, it'll cause the build to fall and morph to hang
+	// FIXME: Build errors does not bubble up correctly (try setting `services.haproxy.enable = true;`, it'll cause the build to fall and Quetzal to hang
 
 	resultPath, err := cruft.ExecBuild(opts, hosts)
 	if err != nil {

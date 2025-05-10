@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/DBCDK/morph/cache"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/nix"
+	"github.com/quetzal-deploy/quetzal/cache"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/nix"
 )
 
 type None struct{}
@@ -55,18 +55,18 @@ func (action *Wrapper) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, action)
 }
 
-func (_ None) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (_ None) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return nil
 }
 
-func (step Gate) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (step Gate) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return nil
 }
 
-func (step Skip) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (step Skip) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return nil
 }
 
-func (step Wrapper) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (step Wrapper) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return nil
 }

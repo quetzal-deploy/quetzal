@@ -1,8 +1,8 @@
 package main
 
-// TODO: Morph NixOS integration tests
+// TODO: Quetzal NixOS integration tests
 // TODO: turn all `panic`'s into proper error handling
-// TODO: remove --passwd since morph can then ignore stdin and doesn't have to figure out how to share it between steps
+// TODO: remove --passwd since Quetzal can then ignore stdin and doesn't have to figure out how to share it between steps
 // TODO: 12:14AM ERR error marshalling plan to JSON error="json: error calling MarshalJSON for type steps.Step: json: error calling MarshalJSON for type steps.Step: json: error calling MarshalJSON for type steps.Step: unmarshall: unknown action: wait-for-online"
 //     ^ drop wait-for-online and let it be a repeating gate/step kinda thing that calls IsOnline
 import (
@@ -19,18 +19,18 @@ import (
 
 	"github.com/DBCDK/kingpin"
 
-	"github.com/DBCDK/morph/cliparser"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/cruft"
-	"github.com/DBCDK/morph/events"
-	"github.com/DBCDK/morph/internal/constraints"
-	"github.com/DBCDK/morph/internal/daemon"
-	"github.com/DBCDK/morph/internal/http"
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/planner"
-	"github.com/DBCDK/morph/steps"
-	"github.com/DBCDK/morph/ui"
-	"github.com/DBCDK/morph/utils"
+	"github.com/quetzal-deploy/quetzal/cliparser"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/cruft"
+	"github.com/quetzal-deploy/quetzal/events"
+	"github.com/quetzal-deploy/quetzal/internal/constraints"
+	"github.com/quetzal-deploy/quetzal/internal/daemon"
+	"github.com/quetzal-deploy/quetzal/internal/http"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/planner"
+	"github.com/quetzal-deploy/quetzal/steps"
+	"github.com/quetzal-deploy/quetzal/ui"
+	"github.com/quetzal-deploy/quetzal/utils"
 )
 
 // These are set at build time via -ldflags magic
@@ -43,7 +43,7 @@ func setup() {
 	utils.SignalHandler()
 
 	if assetRoot == "" {
-		common.HandleError(errors.New("Morph must be compiled with \"-ldflags=-X main.assetRoot=<path-to-installed-data/>\"."))
+		common.HandleError(errors.New("Quetzal must be compiled with \"-ldflags=-X main.assetRoot=<path-to-installed-data/>\"."))
 	}
 }
 
@@ -52,14 +52,14 @@ func main() {
 	// TODO: Implement "context" part of a plan is running on:
 	// Default context = local
 	// A context can change the host something is running on
-	// nix copy morph itself to the new host, and execute it with the sub-plan
+	// nix copy Quetzal itself to the new host, and execute it with the sub-plan
 	// eg context:local -> repeat-until-success -> context:$host -> exec command (health check)
-	// Running the deploy from Matrix can also be a context, and the local morph will wait for it to finish
+	// Running the deploy from Matrix can also be a context, and the local Quetzal will wait for it to finish
 	// Try substitute on remote host before building locally (to avoid downloaded things that will be substituted from cache
 	// Wrap exec.Command to unify logging the command and to give each command a unique ID that can be used to reconstruct what is being logged
-	// Find a way to log commands where host is the machine executing morph
+	// Find a way to log commands where host is the machine executing Quetzal
 	// Detect when a process wants STDIN-input and find a way to handle that - mostly relevant for SSH TOFU prompts
-	// Tyvstjæl hvordan K8s deployments virker med min og max men brug det på tags. Når dette aktiveres skal morph først health checke alt så morph ved hvor meget der er oppe og nede
+	// Tyvstjæl hvordan K8s deployments virker med min og max men brug det på tags. Når dette aktiveres skal Quetzal først health checke alt så Quetzal ved hvor meget der er oppe og nede
 	// Replace tags with labels
 	// Canary mode: Ramp up concurrency along with successful updates
 	// Some steps should be implicit, like running nix-build on demand
@@ -100,7 +100,7 @@ func main() {
 	if !*opts.JsonOut {
 		go func() {
 			if _, err := tui.Run(); err != nil {
-				fmt.Printf("morph failed: %v", err)
+				fmt.Printf("Quetzal failed: %v", err)
 				os.Exit(1)
 			}
 		}()
@@ -251,7 +251,7 @@ func main() {
 		}
 
 		if !*opts.JsonOut {
-			// Let the user terminate morph from the UI
+			// Let the user terminate Quetzal from the UI
 			tui.Wait()
 		}
 	}
@@ -282,7 +282,7 @@ func main() {
 
 // TODO: Different planners should have default constraints exposed, to be displayed in the UI for suggestions to override
 // FIXME: Refactor to not need cmdClauses and opts
-func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.MorphOptions, hosts []nix.Host, clause string) steps.Step {
+func createPlan(cmdClauses *cliparser.KingpinCmdClauses, opts *common.QuetzalOptions, hosts []nix.Host, clause string) steps.Step {
 	plan := steps.New().
 		Id("root").
 		Description("Root of execution plan").

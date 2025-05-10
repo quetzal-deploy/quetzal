@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/logging"
-	"github.com/DBCDK/morph/utils"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/logging"
+	"github.com/quetzal-deploy/quetzal/utils"
 
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -36,7 +36,7 @@ type SSHContext struct {
 	SshOptions *common.SshOptions
 }
 
-func CreateSSHContext(options *common.MorphOptions) *SSHContext {
+func CreateSSHContext(options *common.QuetzalOptions) *SSHContext {
 	return &SSHContext{
 		SshOptions: options.SshOptions(),
 	}

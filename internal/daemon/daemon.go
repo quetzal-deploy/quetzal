@@ -6,24 +6,24 @@ import (
 	"path"
 	"strings"
 
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/cruft"
-	"github.com/DBCDK/morph/nix"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/cruft"
+	"github.com/quetzal-deploy/quetzal/nix"
 )
 
 type Daemon struct {
 	Deployments map[string]Deployment
 	//EventManager *events.Manager
 
-	morphOptions    *common.MorphOptions
+	quetzalOptions  *common.QuetzalOptions
 	deploymentsPath string
 }
 
-func NewDaemon(opts *common.MorphOptions) Daemon {
+func NewDaemon(opts *common.QuetzalOptions) Daemon {
 	return Daemon{
 		Deployments: make(map[string]Deployment),
 		//EventManager:    nil,
-		morphOptions: opts,
+		quetzalOptions: opts,
 	}
 }
 
@@ -51,10 +51,10 @@ func (daemon *Daemon) LoadDeployments(deploymentsDir string) error {
 		if strings.HasSuffix(f.Name(), suffix) {
 			p := path.Join(deploymentsDir, f.Name())
 
-			daemon.morphOptions.Deployment = p
+			daemon.quetzalOptions.Deployment = p
 
 			fmt.Println(p)
-			meta, hosts, err := cruft.GetHosts(daemon.morphOptions)
+			meta, hosts, err := cruft.GetHosts(daemon.quetzalOptions)
 
 			if err != nil {
 				panic(err.Error())

@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"fmt"
 
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/steps"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/steps"
 )
 
 type XSchedule struct {

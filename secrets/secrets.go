@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/DBCDK/morph/ssh"
-	"github.com/DBCDK/morph/utils"
+	"github.com/quetzal-deploy/quetzal/ssh"
+	"github.com/quetzal-deploy/quetzal/utils"
 )
 
 type SecretError struct {

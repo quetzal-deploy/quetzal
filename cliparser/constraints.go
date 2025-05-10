@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/DBCDK/morph/internal/constraints"
+	"github.com/quetzal-deploy/quetzal/internal/constraints"
 )
 
 func ParseConstraints(constraintFlags []string) (result []constraints.Constraint, err error) {

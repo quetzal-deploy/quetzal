@@ -1,7 +1,7 @@
 package events
 
 import (
-	"github.com/DBCDK/morph/steps"
+	"github.com/quetzal-deploy/quetzal/steps"
 )
 
 type Event interface {

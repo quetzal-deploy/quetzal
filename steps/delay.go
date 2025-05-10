@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/DBCDK/morph/cache"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/nix"
+	"github.com/quetzal-deploy/quetzal/cache"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/nix"
 )
 
 type Delay struct {
@@ -34,7 +34,7 @@ func (delay *Delay) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, delay)
 }
 
-func (delay *Delay) Run(ctx context.Context, opts *common.MorphOptions, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (delay *Delay) Run(ctx context.Context, opts *common.QuetzalOptions, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 
 	time.Sleep(time.Millisecond * time.Duration(delay.MilliSeconds))
 

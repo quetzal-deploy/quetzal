@@ -3,7 +3,7 @@ package filter
 import (
 	"testing"
 
-	"github.com/DBCDK/morph/nix"
+	"github.com/quetzal-deploy/quetzal/nix"
 )
 
 func getHosts() (hosts []nix.Host) {

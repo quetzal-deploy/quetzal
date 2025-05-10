@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"github.com/DBCDK/morph/planner"
-	"github.com/DBCDK/morph/steps"
+	"github.com/quetzal-deploy/quetzal/planner"
+	"github.com/quetzal-deploy/quetzal/steps"
 )
 
 func CountChildSteps(step steps.Step) int {

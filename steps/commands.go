@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/DBCDK/morph/cache"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/nix"
+	"github.com/quetzal-deploy/quetzal/cache"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/nix"
 )
 
 type LocalCommand struct {
@@ -51,10 +51,10 @@ func (action *RemoteCommand) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, action)
 }
 
-func (action LocalCommand) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action LocalCommand) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return errors.New("not implemented: " + action.Name())
 }
 
-func (action RemoteCommand) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action RemoteCommand) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	return errors.New("not implemented: " + action.Name())
 }

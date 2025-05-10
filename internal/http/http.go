@@ -8,14 +8,14 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/DBCDK/morph/events"
-	"github.com/DBCDK/morph/internal/daemon"
-	"github.com/DBCDK/morph/nix"
+	"github.com/quetzal-deploy/quetzal/events"
+	"github.com/quetzal-deploy/quetzal/internal/daemon"
+	"github.com/quetzal-deploy/quetzal/nix"
 )
 
 var (
-	morphDaemon  *daemon.Daemon
-	eventManager *events.Manager = nil
+	quetzalDaemon *daemon.Daemon
+	eventManager  *events.Manager = nil
 )
 
 type Deployment struct {
@@ -27,7 +27,7 @@ type Deployment struct {
 }
 
 func Run(daemon *daemon.Daemon, port int, manager *events.Manager, deploymentsPath string) {
-	morphDaemon = daemon
+	quetzalDaemon = daemon
 	eventManager = manager
 
 	e := echo.New()
@@ -47,12 +47,12 @@ func Run(daemon *daemon.Daemon, port int, manager *events.Manager, deploymentsPa
 }
 
 func handlerGetDeployments(c echo.Context) error {
-	return c.JSONPretty(http.StatusOK, morphDaemon.Deployments, "  ")
+	return c.JSONPretty(http.StatusOK, quetzalDaemon.Deployments, "  ")
 }
 
 func handlerGetDeploymentById(c echo.Context) error {
 
-	deployment := morphDaemon.Deployments[c.Param("id")]
+	deployment := quetzalDaemon.Deployments[c.Param("id")]
 
 	//meta, hosts, _ := cruft.GetHosts(mctx, deployment.Path)
 	//

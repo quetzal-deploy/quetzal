@@ -3,11 +3,11 @@ package ssh
 import (
 	"testing"
 
-	"github.com/DBCDK/morph/common"
+	"github.com/quetzal-deploy/quetzal/common"
 )
 
 func TestCreateSSHContextWithoutEnvVars(t *testing.T) {
-	sshContext := CreateSSHContext(&common.MorphOptions{})
+	sshContext := CreateSSHContext(&common.QuetzalOptions{})
 
 	if sshContext.SshOptions.ConfigFile != "" {
 		t.Fatalf("Expected empty SSH ConfigFile, got %s", sshContext.SshOptions.ConfigFile)
@@ -27,7 +27,7 @@ func TestCreateSSHContextWithoutEnvVars(t *testing.T) {
 }
 
 func TestCreateSSHContextWithEnvVars(t *testing.T) {
-	defaultUsername := "morpheus"
+	defaultUsername := "quetzal"
 	t.Setenv("SSH_USER", defaultUsername)
 
 	skipHostKeyCheck := "YES"
@@ -39,7 +39,7 @@ func TestCreateSSHContextWithEnvVars(t *testing.T) {
 	sshIdentityFile := "/fake/file"
 	t.Setenv("SSH_IDENTITY_FILE", sshIdentityFile)
 
-	sshContext := CreateSSHContext(&common.MorphOptions{})
+	sshContext := CreateSSHContext(&common.QuetzalOptions{})
 
 	if sshContext.SshOptions.ConfigFile != sshConfigFile {
 		t.Fatalf("Expected SSH ConfigFile = '%s', got '%s'", sshConfigFile, sshContext.SshOptions.ConfigFile)
@@ -65,7 +65,7 @@ func TestCreateSSHContextSkipHostKeyCheck(t *testing.T) {
 	for _, input := range skipTrueValues {
 		t.Setenv("SSH_SKIP_HOST_KEY_CHECK", input)
 
-		sshContext := CreateSSHContext(&common.MorphOptions{})
+		sshContext := CreateSSHContext(&common.QuetzalOptions{})
 
 		if sshContext.SshOptions.SkipHostKeyCheck != true {
 			t.Fatalf("Expected SkipHostKeyCheck = true using SSH_SKIP_HOST_KEY_CHECK='%s'", input)
@@ -75,7 +75,7 @@ func TestCreateSSHContextSkipHostKeyCheck(t *testing.T) {
 	for _, input := range skipFalseValues {
 		t.Setenv("SSH_SKIP_HOST_KEY_CHECK", input)
 
-		sshContext := CreateSSHContext(&common.MorphOptions{})
+		sshContext := CreateSSHContext(&common.QuetzalOptions{})
 
 		if sshContext.SshOptions.SkipHostKeyCheck != false {
 			t.Fatalf("Expected SkipHostKeyCheck = false using SSH_SKIP_HOST_KEY_CHECK='%s'", input)

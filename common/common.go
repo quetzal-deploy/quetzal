@@ -7,10 +7,10 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/DBCDK/morph/utils"
+	"github.com/quetzal-deploy/quetzal/utils"
 )
 
-type MorphOptions struct {
+type QuetzalOptions struct {
 	Version   string
 	AssetRoot string
 
@@ -69,11 +69,11 @@ type SshOptions struct {
 	SkipHostKeyCheck       bool
 }
 
-func (o *MorphOptions) NixOptions() *NixOptions {
-	evalCmd := os.Getenv("MORPH_NIX_EVAL_CMD")
-	buildCmd := os.Getenv("MORPH_NIX_BUILD_CMD")
-	shellCmd := os.Getenv("MORPH_NIX_SHELL_CMD")
-	evalMachines := os.Getenv("MORPH_NIX_EVAL_MACHINES")
+func (o *QuetzalOptions) NixOptions() *NixOptions {
+	evalCmd := os.Getenv("QUETZAL_NIX_EVAL_CMD")
+	buildCmd := os.Getenv("QUETZAL_NIX_BUILD_CMD")
+	shellCmd := os.Getenv("QUETZAL_NIX_SHELL_CMD")
+	evalMachines := os.Getenv("QUETZAL_NIX_EVAL_MACHINES")
 
 	if evalCmd == "" {
 		evalCmd = "nix-instantiate"
@@ -99,7 +99,7 @@ func (o *MorphOptions) NixOptions() *NixOptions {
 	}
 }
 
-func (o *MorphOptions) SshOptions() *SshOptions {
+func (o *QuetzalOptions) SshOptions() *SshOptions {
 	skipHostKeyEnv := strings.ToLower(os.Getenv("SSH_SKIP_HOST_KEY_CHECK"))
 	skipHostKeyCheck := skipHostKeyEnv == "yes" || skipHostKeyEnv == "true"
 

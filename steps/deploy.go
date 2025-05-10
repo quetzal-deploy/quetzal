@@ -8,10 +8,10 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/DBCDK/morph/cache"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/ssh"
+	"github.com/quetzal-deploy/quetzal/cache"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/ssh"
 )
 
 type DeployBoot struct {
@@ -99,7 +99,7 @@ func (action *DeployTest) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, &action)
 }
 
-func (action DeployBoot) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action DeployBoot) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
@@ -108,7 +108,7 @@ func (action DeployBoot) Run(ctx context.Context, opts *common.MorphOptions, all
 	return deploy(ctx, opts, cache_, host, "boot")
 }
 
-func (action DeployDryActivate) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action DeployDryActivate) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
@@ -117,7 +117,7 @@ func (action DeployDryActivate) Run(ctx context.Context, opts *common.MorphOptio
 	return deploy(ctx, opts, cache_, host, "dry-activate")
 }
 
-func (action DeploySwitch) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action DeploySwitch) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
@@ -126,7 +126,7 @@ func (action DeploySwitch) Run(ctx context.Context, opts *common.MorphOptions, a
 	return deploy(ctx, opts, cache_, host, "switch")
 }
 
-func (action DeployTest) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action DeployTest) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	host, ok := allHosts[action.Host]
 	if !ok {
 		return errors.New(fmt.Sprintf("host '%s' not in deployment", action.Host))
@@ -135,7 +135,7 @@ func (action DeployTest) Run(ctx context.Context, opts *common.MorphOptions, all
 	return deploy(ctx, opts, cache_, host, "test")
 }
 
-func deploy(ctx context.Context, opts *common.MorphOptions, cache_ *cache.LockedMap[string], host nix.Host, deployAction string) error {
+func deploy(ctx context.Context, opts *common.QuetzalOptions, cache_ *cache.LockedMap[string], host nix.Host, deployAction string) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	log.Info().Msg(fmt.Sprintf("Executing %s on %s", deployAction, host.Name))

@@ -1,8 +1,8 @@
 package planner
 
 import (
-	"github.com/DBCDK/morph/healthchecks"
-	"github.com/DBCDK/morph/steps"
+	"github.com/quetzal-deploy/quetzal/healthchecks"
+	"github.com/quetzal-deploy/quetzal/steps"
 )
 
 func HealthCheckToCommand(check healthchecks.CmdHealthCheck) CommandPlus {

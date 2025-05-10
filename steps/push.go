@@ -7,10 +7,10 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/DBCDK/morph/cache"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/ssh"
+	"github.com/quetzal-deploy/quetzal/cache"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/ssh"
 )
 
 type Push struct {
@@ -37,7 +37,7 @@ func (push *Push) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, push)
 }
 
-func (push *Push) Run(ctx context.Context, opts *common.MorphOptions, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (push *Push) Run(ctx context.Context, opts *common.QuetzalOptions, hosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	cacheKey := "closure:" + push.Host

@@ -13,9 +13,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
 
-	"github.com/DBCDK/morph/events"
-	"github.com/DBCDK/morph/planner"
-	"github.com/DBCDK/morph/steps"
+	"github.com/quetzal-deploy/quetzal/events"
+	"github.com/quetzal-deploy/quetzal/planner"
+	"github.com/quetzal-deploy/quetzal/steps"
 )
 
 var (
@@ -294,7 +294,7 @@ func (m model) menuView() string {
 }
 
 func (m model) headerView() string {
-	title := titleStyle.Render("morph: plan")
+	title := titleStyle.Render("Quetzal: plan")
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(title)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
 }

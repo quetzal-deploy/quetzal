@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/DBCDK/morph/cache"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/logging"
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/ssh"
+	"github.com/quetzal-deploy/quetzal/cache"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/logging"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/ssh"
 )
 
 type IsOnline struct {
@@ -52,7 +52,7 @@ func (action *Reboot) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, action)
 }
 
-func (action IsOnline) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action IsOnline) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	host, ok := allHosts[action.Host]
@@ -71,7 +71,7 @@ func (action IsOnline) Run(ctx context.Context, opts *common.MorphOptions, allHo
 
 	return err
 }
-func (action Reboot) Run(ctx context.Context, opts *common.MorphOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
+func (action Reboot) Run(ctx context.Context, opts *common.QuetzalOptions, allHosts map[string]nix.Host, cache_ *cache.LockedMap[string]) error {
 	sshContext := ssh.CreateSSHContext(opts)
 
 	host, exists := allHosts[action.Host]

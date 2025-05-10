@@ -13,13 +13,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/DBCDK/morph/cache"
-	"github.com/DBCDK/morph/common"
-	"github.com/DBCDK/morph/events"
-	"github.com/DBCDK/morph/internal/constraints"
-	"github.com/DBCDK/morph/logging"
-	"github.com/DBCDK/morph/nix"
-	"github.com/DBCDK/morph/steps"
+	"github.com/quetzal-deploy/quetzal/cache"
+	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/events"
+	"github.com/quetzal-deploy/quetzal/internal/constraints"
+	"github.com/quetzal-deploy/quetzal/logging"
+	"github.com/quetzal-deploy/quetzal/nix"
+	"github.com/quetzal-deploy/quetzal/steps"
 )
 
 const (
@@ -31,16 +31,16 @@ const (
 	Failed  string = "failed"
 )
 
-// FIXME: IDEA: Deployment simulation - make a fake MorphContext where things like SSH-calls are faked and logged instead
+// FIXME: IDEA: Deployment simulation - make a fake QuetzalContext where things like SSH-calls are faked and logged instead
 
 type Planner struct {
-	Hosts        map[string]nix.Host
-	MorphOptions *common.MorphOptions
-	Cache        *cache.LockedMap[string]
-	StepStatus   *cache.LockedMap[string]
-	Steps        *cache.LockedMap[steps.Step]
-	Constraints  []constraints.Constraint
-	EventManager *events.Manager
+	Hosts          map[string]nix.Host
+	QuetzalOptions *common.QuetzalOptions
+	Cache          *cache.LockedMap[string]
+	StepStatus     *cache.LockedMap[string]
+	Steps          *cache.LockedMap[steps.Step]
+	Constraints    []constraints.Constraint
+	EventManager   *events.Manager
 
 	context     context.Context
 	tickChan    chan bool
@@ -52,12 +52,12 @@ type Planner struct {
 	pauseReason string
 }
 
-func NewPlanner(eventMgr *events.Manager, hosts map[string]nix.Host, opts *common.MorphOptions, constraints []constraints.Constraint) *Planner {
+func NewPlanner(eventMgr *events.Manager, hosts map[string]nix.Host, opts *common.QuetzalOptions, constraints []constraints.Constraint) *Planner {
 	eventChan := eventMgr.Subscribe()
 
 	planner := &Planner{
-		Hosts:        hosts,
-		MorphOptions: opts,
+		Hosts:          hosts,
+		QuetzalOptions: opts,
 
 		Constraints: constraints,
 
@@ -587,7 +587,7 @@ func (planner *Planner) waitForChildrenToComplete(ctx context.Context, step step
 }
 
 func (planner *Planner) ExecuteStep(ctx context.Context, step steps.Step) error {
-	err := step.Action.Run(ctx, planner.MorphOptions, planner.Hosts, planner.Cache)
+	err := step.Action.Run(ctx, planner.QuetzalOptions, planner.Hosts, planner.Cache)
 	if err != nil {
 		return err
 	}
