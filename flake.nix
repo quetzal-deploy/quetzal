@@ -2,7 +2,7 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     flake-utils = {
       url = "github:numtide/flake-utils";
@@ -54,12 +54,13 @@
               # some treefmt formatters are not supported in pre-commit-hooks we
               # filter them out for now.
               toFilter = [
-                "yamlfmt"
+                "goimports"
                 "nixfmt"
+                "yamlfmt"
               ];
               filterFn = n: _v: (!builtins.elem n toFilter);
               treefmtFormatters = pkgs.lib.mapAttrs (_n: v: { inherit (v) enable; }) (
-                pkgs.lib.filterAttrs filterFn (import ./treefmt.nix).programs
+                pkgs.lib.filterAttrs filterFn (import ./treefmt.nix { inherit pkgs; }).programs
               );
             in
             pre-commit-hooks.lib.${system}.run {

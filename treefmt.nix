@@ -1,3 +1,4 @@
+{ pkgs, ... }:
 {
   projectRootFile = "flake.nix";
   programs = {
@@ -7,6 +8,7 @@
     taplo.enable = true; # toml
     yamlfmt.enable = true; # yaml
     gofmt.enable = true;
+    goimports.enable = true;
   };
   settings = {
     formatter = {
@@ -18,14 +20,14 @@
         "*.nix"
         "./data/*"
       ];
+      goimports.entry = "";
       goimports = {
-        command = "goimports";
         includes = [ "*.go" ];
         excludes = [ "vendor/*" ];
         options = [
           "-w"
           "-local"
-          "github.com/DBCDK"
+          "github.com/quetzal-deploy"
         ];
       };
     };
