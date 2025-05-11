@@ -54,12 +54,13 @@
               # some treefmt formatters are not supported in pre-commit-hooks we
               # filter them out for now.
               toFilter = [
-                "yamlfmt"
+                "goimports"
                 "nixfmt"
+                "yamlfmt"
               ];
               filterFn = n: _v: (!builtins.elem n toFilter);
               treefmtFormatters = pkgs.lib.mapAttrs (_n: v: { inherit (v) enable; }) (
-                pkgs.lib.filterAttrs filterFn (import ./treefmt.nix).programs
+                pkgs.lib.filterAttrs filterFn (import ./treefmt.nix { inherit pkgs; }).programs
               );
             in
             pre-commit-hooks.lib.${system}.run {
@@ -74,6 +75,8 @@
         devShells.default = pkgs.mkShell {
           inherit (self.checks.${system}.pre-commit-check) shellHook;
           inputsFrom = [ self.packages.${system}.quetzal ];
+
+          packages = with pkgs; [ gotools ];
         };
 
         packages = rec {
