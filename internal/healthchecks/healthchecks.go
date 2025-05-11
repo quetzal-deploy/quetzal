@@ -3,10 +3,11 @@ package healthchecks
 import (
 	"errors"
 	"fmt"
-	"github.com/quetzal-deploy/quetzal/ssh"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/quetzal-deploy/quetzal/internal/ssh"
 )
 
 func PerformChecks(sshContext *ssh.SSHContext, checkName string, host Host, healthChecks HealthChecks, timeout int) (err error) {

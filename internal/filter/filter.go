@@ -2,7 +2,8 @@ package filter
 
 import (
 	"github.com/gobwas/glob"
-	"github.com/quetzal-deploy/quetzal/nix"
+
+	"github.com/quetzal-deploy/quetzal/internal/nix"
 )
 
 func MatchHosts(allHosts []nix.Host, pattern string) (hosts []nix.Host, err error) {

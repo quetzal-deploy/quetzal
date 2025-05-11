@@ -14,11 +14,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/quetzal-deploy/quetzal/common"
-	"github.com/quetzal-deploy/quetzal/healthchecks"
-	"github.com/quetzal-deploy/quetzal/secrets"
-	"github.com/quetzal-deploy/quetzal/ssh"
-	"github.com/quetzal-deploy/quetzal/utils"
+	"github.com/quetzal-deploy/quetzal/internal/common"
+	"github.com/quetzal-deploy/quetzal/internal/healthchecks"
+	"github.com/quetzal-deploy/quetzal/internal/secrets"
+	"github.com/quetzal-deploy/quetzal/internal/ssh"
+	"github.com/quetzal-deploy/quetzal/internal/utils"
 )
 
 type Host struct {

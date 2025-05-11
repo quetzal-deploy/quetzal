@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/quetzal-deploy/quetzal/common"
-	"github.com/quetzal-deploy/quetzal/filter"
-	"github.com/quetzal-deploy/quetzal/healthchecks"
-	"github.com/quetzal-deploy/quetzal/nix"
-	"github.com/quetzal-deploy/quetzal/ssh"
-	"github.com/quetzal-deploy/quetzal/utils"
+	"github.com/quetzal-deploy/quetzal/internal/common"
+	"github.com/quetzal-deploy/quetzal/internal/filter"
+	"github.com/quetzal-deploy/quetzal/internal/healthchecks"
+	"github.com/quetzal-deploy/quetzal/internal/nix"
+	"github.com/quetzal-deploy/quetzal/internal/ssh"
+	"github.com/quetzal-deploy/quetzal/internal/utils"
 )
 
 func ExecBuild(opts *common.QuetzalOptions, hosts []nix.Host) (string, error) {

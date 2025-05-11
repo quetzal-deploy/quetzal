@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/quetzal-deploy/quetzal/ssh"
-	"github.com/quetzal-deploy/quetzal/utils"
+	"github.com/quetzal-deploy/quetzal/internal/ssh"
+	"github.com/quetzal-deploy/quetzal/internal/utils"
 )
 
 type SecretError struct {

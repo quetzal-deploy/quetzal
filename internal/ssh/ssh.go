@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/quetzal-deploy/quetzal/common"
-	"github.com/quetzal-deploy/quetzal/utils"
+	"github.com/quetzal-deploy/quetzal/internal/common"
+	"github.com/quetzal-deploy/quetzal/internal/utils"
 )
 
 type Host interface {

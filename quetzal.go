@@ -7,9 +7,9 @@ import (
 
 	"github.com/DBCDK/kingpin"
 
-	"github.com/quetzal-deploy/quetzal/cliparser"
-	"github.com/quetzal-deploy/quetzal/cruft"
-	"github.com/quetzal-deploy/quetzal/utils"
+	"github.com/quetzal-deploy/quetzal/internal/cliparser"
+	"github.com/quetzal-deploy/quetzal/internal/cruft"
+	"github.com/quetzal-deploy/quetzal/internal/utils"
 )
 
 // These are set at build time via -ldflags magic

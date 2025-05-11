@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quetzal-deploy/quetzal/ssh"
-	"github.com/quetzal-deploy/quetzal/utils"
+	"github.com/quetzal-deploy/quetzal/internal/ssh"
+	"github.com/quetzal-deploy/quetzal/internal/utils"
 )
 
 type Host interface {

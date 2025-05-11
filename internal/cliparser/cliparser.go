@@ -5,7 +5,7 @@ import (
 
 	"github.com/DBCDK/kingpin"
 
-	"github.com/quetzal-deploy/quetzal/common"
+	"github.com/quetzal-deploy/quetzal/internal/common"
 )
 
 type KingpinCmdClauses struct {
