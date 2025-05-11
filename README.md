@@ -6,6 +6,20 @@
 Quetzal is a tool for managing existing NixOS hosts - basically a fancy wrapper around `nix-build`, `nix copy`, `nix-env`, `/nix/store/.../bin/switch-to-configuration`, `scp` and more.
 Quetzal supports updating multiple hosts in a row, and with support for health checks makes it fairly safe to do so.
 
+The work that is the basis for Quetzal was originally started as a series of patches for https://github.com/DBCDK/morph, but since the changes are going to be substantial I'm not sure this will be recognizable as morph (and it might fail entirely), so for the time being this work will happen in this fork. That way there is also lower expectations of anything resembling backwards compatibility. The work exists in a very disorganized branch, `experimental`, that has served as a bit of a playground, but now the plan is to extract these features neatly into the master branch, little by little, so that work can yet again be based on the master branch.
+
+Features migrated from `experimental` to `master`.
+- [ ] event system
+- [ ] execution engine / planner
+- [ ] constraint system
+- [ ] new UI
+- [ ] daemon mode
+- [ ] ...
+
+Warning: Just because something exists in master, nothing will be considered stable until a first release.
+
+
+# Old docs
 
 ## Notable features
 
