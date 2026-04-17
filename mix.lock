@@ -1,0 +1,5 @@
+%{
+  "elixir_uuid": {:hex, :elixir_uuid, "1.2.1", "dce506597acb7e6b0daeaff52ff6a9043f5919a4c3315abb4143f0b00378c097", [:mix], [], "hexpm", "f7eba2ea6c3555cea09706492716b0d87397b88946e6380898c2889d68585752"},
+  "jason": {:hex, :jason, "1.4.4", "b9226785a9aa77b6857ca22832cffa5d5011a667207eb2a0ad56adb5db443b8a", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "c5eb0cab91f094599f94d55bc63409236a8ec69a21a67814529e8d5f6cc90b3b"},
+  "norm": {:hex, :norm, "0.13.1", "f4c7effe3926e7a27cbf835470e13941916c49209d65c2f3035d05ac21c948b2", [:mix], [{:stream_data, "~> 0.6 or ~> 1.0", [hex: :stream_data, repo: "hexpm", optional: true]}], "hexpm", "b29f4b2f0a2dae13b4793300dd1a08bbacb0d66e2c665e42b364b1be8e3233f3"},
+}
