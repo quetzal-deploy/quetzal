@@ -3,9 +3,13 @@
 {
   # https://devenv.sh/basics/
   env.GREET = "devenv";
+  env.TAILWINDCSS_PATH = lib.getExe pkgs.tailwindcss_4;
 
   # https://devenv.sh/packages/
-  packages = [ pkgs.git ];
+  packages = with pkgs; [
+    git
+    inotify-tools
+  ];
 
   # https://devenv.sh/languages/
   languages.rust.enable = true;

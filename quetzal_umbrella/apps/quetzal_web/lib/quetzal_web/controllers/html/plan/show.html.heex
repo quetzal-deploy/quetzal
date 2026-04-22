@@ -1,0 +1,5 @@
+<Layouts.app flash={@flash}>
+<ul>
+  <li :for={{step_id, state} <- @step_states}>{@steps[step_id]["description"]}: {inspect(state)}</li>
+</ul>
+</Layouts.app>

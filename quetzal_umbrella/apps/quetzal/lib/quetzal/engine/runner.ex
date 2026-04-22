@@ -3,17 +3,17 @@ defmodule Quetzal.Engine.Runner do
     "none" => Quetzal.Actions.None,
     "is-online" => Quetzal.Actions.IsOnline,
     "build" => Quetzal.Actions.Build,
-    # "deploy-switch" => Quetzal.Actions.DeploySwitch,
+    "deploy-switch" => Quetzal.Actions.DeploySwitch,
   }
 
-  def run_step(%{"id" => id, "action" => action} = step) do
-    IO.puts("running: #{id}")
-    Process.sleep(100)
+  def run_step(plan_id, %{"id" => step_id, "action" => action} = step) do
+    IO.puts("running: #{step_id}")
+    Process.sleep(2000)
     case Map.fetch(@actions, action) do
       {:ok, module} -> module.run(step)
       :error -> {:error, {:unknown_action, action}}
     end
-    IO.puts("done: #{id}")
-    Quetzal.Engine.mark_step_done(id)
+    IO.puts("done: #{step_id}")
+    Quetzal.Engine.mark_step_done(plan_id, step_id)
   end
 end
