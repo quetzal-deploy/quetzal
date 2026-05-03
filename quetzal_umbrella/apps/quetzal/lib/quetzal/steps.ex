@@ -3,6 +3,7 @@ defmodule Quetzal.Steps do
     %{
       "id" => UUID.uuid4(),
       "dependencies" => [],
+      parent: nil,
     }
   end
 
@@ -29,7 +30,7 @@ defmodule Quetzal.Steps do
       child_steps
       # add each parent as dependecy to its children
       |> Enum.map(fn %{"dependencies" => dependencies} = child ->
-        %{ child | "dependencies" => [ id | dependencies ] }
+        %{ child | "dependencies" => [ id | dependencies ], parent: id }
       end)
       # turn in to map while recursing
       |> Enum.reduce(%{id => step_without_children}, fn child, acc ->

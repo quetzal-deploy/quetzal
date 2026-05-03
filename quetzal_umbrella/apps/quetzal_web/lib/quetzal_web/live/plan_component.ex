@@ -15,12 +15,16 @@ defmodule QuetzalWeb.PlanComponent do
     ~H"""
     <% stats = plan_stats(@plan) %>
     <.link href={~p"/plans/#{@plan.id}"} class={["plan", stats.state, @current_plan_id == @plan.id && "active"]}>
+      <div class="state">
+        <button :if={!@plan.paused} phx-click="plan_pause" phx-value-plan_id={@plan.id}>running</button>
+        <button :if={@plan.paused} phx-click="plan_unpause" phx-value-plan_id={@plan.id}>paused</button>
+      </div>
       <div class="timings">
         <div class="start">{display_time(@plan.scheduled)}</div>
         <div class="end">{display_time(@plan.completed)}</div>
       </div>
       <div class="description">{ @plan.description }</div>
-      <div class="state">
+      <div class="info">
         steps: {stats.steps.total} |
         running: {stats.steps.running} |
         done: {stats.steps.done}

@@ -22,6 +22,7 @@ defmodule Quetzal.Engine do
     {
       :ok,
       %{
+        paused: false,
         plans: %{},
       }
     }
@@ -52,6 +53,7 @@ defmodule Quetzal.Engine do
 
     plan_with_metadata = Map.merge(plan, %{
       id: plan_id,
+      paused: false,
       scheduled: DateTime.utc_now,
       completed: nil,
       description: plan_inner["description"],
@@ -68,6 +70,7 @@ defmodule Quetzal.Engine do
     }
 
     IO.inspect(new_state)
+    GenServer.cast(__MODULE__, :broadcast_state)
     GenServer.cast(__MODULE__, :tick)
     IO.puts("tick sent")
 
@@ -82,14 +85,19 @@ defmodule Quetzal.Engine do
     {:reply, state, state}
   end
 
-  def handle_cast(:tick, state) do
+  def handle_cast(:tick, %{paused: true} = state) do
+    IO.puts "Tick skipped: Engine is paused"
+    {:noreply, state}
+  end
+
+  def handle_cast(:tick, %{paused: false} = state) do
     IO.puts("ticking")
 
     desired_states = []
 
     new_plans_state = Map.new(state[:plans], fn {plan_id, plan} ->
 
-      if plan.completed == nil do
+      if plan.completed == nil and plan.paused == false do
         GenServer.cast(__MODULE__, %{tick_plan: plan_id})
       end
 
@@ -150,6 +158,8 @@ defmodule Quetzal.Engine do
 
     updated_step_states = step_states
     |> Map.new(fn {id, step_state} ->
+      step = get_in(plan, [:steps, id])
+
       new_step_state = case step_state do
         :new ->
           case plan[:steps][id]["dependencies"] do
@@ -167,7 +177,16 @@ defmodule Quetzal.Engine do
             # FIXME: also remove steps that are awaiting_children if this step is in the list of children
             # FIXME: ^ children are actually not scheduled yet
             # TODO: FIX THIS NOW
+            # probably has to run in a second loop, to avoid running on partially stale data
           end)
+
+          case step.parent do
+            nil ->
+              1
+
+            parent -> 2
+
+          end
 
           case new_step_ids do
             [] -> :ready
@@ -257,6 +276,13 @@ defmodule Quetzal.Engine do
   end
 
   def handle_call(%{plan_id: plan_id, transition_step: step_id, to: step_state}, _from, state) do
+    case step_state do
+      :done -> 1
+      _ ->
+        new_state = set_step_state(state, plan_id, step_id, step_state)
+
+    end
+
     new_state = set_step_state(state, plan_id, step_id, step_state)
 
     GenServer.cast(__MODULE__, :tick)
@@ -272,5 +298,43 @@ defmodule Quetzal.Engine do
   def handle_cast(:broadcast_state, state) do
     QuetzalWeb.Endpoint.broadcast("state", "state_updated", state)
     {:noreply, state}
+  end
+
+  def pause do
+    GenServer.call(__MODULE__, :pause)
+  end
+
+  def unpause do
+    GenServer.call(__MODULE__, :unpause)
+  end
+
+  def plan_pause(plan_id) do
+    GenServer.call(__MODULE__, %{plan_pause: plan_id})
+  end
+
+  def plan_unpause(plan_id) do
+    GenServer.call(__MODULE__, %{plan_unpause: plan_id})
+  end
+
+  def handle_call(:pause, _from, state) do
+    GenServer.cast(__MODULE__, :broadcast_state)
+    {:reply, :ok, put_in(state, [:paused], true)}
+  end
+
+  def handle_call(:unpause, _from, state) do
+    GenServer.cast(__MODULE__, :broadcast_state)
+    GenServer.cast(__MODULE__, :tick)
+    {:reply, :ok, put_in(state, [:paused], false)}
+  end
+
+  def handle_call(%{plan_pause: plan_id}, _from, state) do
+    GenServer.cast(__MODULE__, :broadcast_state)
+    {:reply, :ok, put_in(state, [:plans, plan_id, :paused], true)}
+  end
+
+  def handle_call(%{plan_unpause: plan_id}, _from, state) do
+    GenServer.cast(__MODULE__, :broadcast_state)
+    GenServer.cast(__MODULE__, %{tick_plan: plan_id})
+    {:reply, :ok, put_in(state, [:plans, plan_id, :paused], false)}
   end
 end
