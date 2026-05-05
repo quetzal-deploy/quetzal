@@ -47,6 +47,25 @@ defmodule Quetzal.Engine do
     Enum.reduce(ids, %{}, fn id, acc -> Map.put(acc, id, nil) end)
   end
 
+  def initialize_plan(%{"plan" => plan_inner, "constraints" => constraints} = plan) do
+    steps = Quetzal.Steps.flatten(plan_inner)
+    ids = Map.keys(steps)
+    pids = initialize_pids(ids)
+    step_states = initialize_step_states(ids)
+
+    Map.merge(plan, %{
+      completed: nil,
+      description: plan_inner["description"],
+      steps: steps,
+      pids: pids,
+      step_states: step_states,
+    })
+    # only add ID if doesn't exist - useful if re-initializing the plan
+    |> Map.put_new(:id, UUID.uuid4())
+    |> Map.put_new(:paused, false)
+    |> Map.put_new(:scheduled, DateTime.utc_now)
+  end
+
   def handle_call(%{schedule_plan: plan}, _from, state) do
     %{"plan" => plan_inner, "constraints" => constraints} = plan
 
@@ -59,19 +78,12 @@ defmodule Quetzal.Engine do
     pids = initialize_pids(ids)
     step_states = initialize_step_states(ids)
 
-    plan_with_metadata = Map.merge(plan, %{
-      id: plan_id,
-      paused: false,
-      scheduled: DateTime.utc_now,
-      completed: nil,
-      description: plan_inner["description"],
-      steps: steps,
-      pids: pids,
-      step_states: step_states,
-    })
+    plan_with_metadata = initialize_plan(plan)
+    |> IO.inspect()
 
     new_state = %{ state |
-      plans: Map.put(state.plans, plan_id, plan_with_metadata),
+      # plans: Map.put(state.plans, plan_id, plan_with_metadata),
+      plans: Map.put(state.plans, plan_with_metadata.id, plan_with_metadata),
       # steps: steps,
       # pids: pids,
       # step_states: step_states,
@@ -401,16 +413,20 @@ defmodule Quetzal.Engine do
   end
 
   def handle_call(%{plan_reset: plan_id}, _from, state) do
-    step_ids = get_in(state, [:plans, plan_id, :step_states])
-    |> Map.keys
+    # step_ids = get_in(state, [:plans, plan_id, :step_states])
+    # |> Map.keys
 
-    new_step_states = initialize_step_states(step_ids)
-    pids = initialize_pids(step_ids)
+    # new_step_states = initialize_step_states(step_ids)
+    # pids = initialize_pids(step_ids)
 
-    state = put_in(state, [:plans, plan_id, :paused], true)
-    |> put_in([:plans, plan_id, :step_states], new_step_states)
-    |> put_in([:plans, plan_id, :pids], pids)
-    |> put_in([:plans, plan_id, :completed], nil)
+    plan = get_in(state, [:plans, plan_id])
+
+    state = state
+    |> put_in([:plans, plan_id], initialize_plan(plan))
+    |> put_in([:plans, plan_id, :paused], true)
+    # |> put_in([:plans, plan_id, :step_states], new_step_states)
+    # |> put_in([:plans, plan_id, :pids], pids)
+    # |> put_in([:plans, plan_id, :completed], nil)
 
     GenServer.cast(__MODULE__, :broadcast_state)
     {:reply, :ok, state}
