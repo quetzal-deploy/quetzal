@@ -10,10 +10,14 @@ defmodule QuetzalWeb.PlanLive do
       <button :if={!@paused} phx-click="pause">pause</button>
       <button :if={@paused} phx-click="unpause">unpause</button>
       <button :if={@paused} phx-click="tick">tick</button>
+      <button phx-click="tick">tick</button>
 
       <div id="plans">
         <QuetzalWeb.PlanComponent.list plans={@plans} current_plan_id={@plan_id} />
         <div id="plan-display">
+          <div class="actions">
+            <button phx-click="plan_reset" phx-value-plan_id={@plan_id}>reset</button>
+          </div>
           <QuetzalWeb.PlanComponent.tree
             steps={@plans[@plan_id].steps}
             step_states={@plans[@plan_id].step_states}
@@ -22,6 +26,9 @@ defmodule QuetzalWeb.PlanLive do
           />
         </div>
       </div>
+      <pre>
+{ inspect(@plans[@plan_id].step_states, pretty: true) }
+      </pre>
     </Layouts.app>
     """
   end
@@ -53,9 +60,6 @@ defmodule QuetzalWeb.PlanLive do
   end
 
   def handle_info(%{topic: topic, event: event, payload: payload}, socket) do
-    IO.inspect(topic)
-    IO.inspect(event)
-    # IO.inspect(payload)
     {
       :noreply,
       assign(
@@ -65,7 +69,8 @@ defmodule QuetzalWeb.PlanLive do
   end
 
   def handle_event("tick", _params, socket) do
-    IO.puts "Not implemented: Single tick"
+    IO.puts "Not implemented: Tick during pause"
+    Quetzal.Engine.tick
     {:noreply, socket}
   end
 
@@ -86,6 +91,11 @@ defmodule QuetzalWeb.PlanLive do
 
   def handle_event("plan_unpause", %{"plan_id" => plan_id}, socket) do
     Quetzal.Engine.plan_unpause(plan_id)
+    {:noreply, socket}
+  end
+
+  def handle_event("plan_reset", %{"plan_id" => plan_id}, socket) do
+    Quetzal.Engine.plan_reset(plan_id)
     {:noreply, socket}
   end
 

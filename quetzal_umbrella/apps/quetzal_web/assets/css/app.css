@@ -211,6 +211,12 @@
     content: "unknown";
 }
 
+.step-tree li.new::before {
+    content: "new";
+}
+.step-tree li.ready::before {
+    content: "ready";
+}
 .step-tree li.running::before {
     content: "running";
     color: steelblue;
