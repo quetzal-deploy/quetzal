@@ -413,20 +413,11 @@ defmodule Quetzal.Engine do
   end
 
   def handle_call(%{plan_reset: plan_id}, _from, state) do
-    # step_ids = get_in(state, [:plans, plan_id, :step_states])
-    # |> Map.keys
-
-    # new_step_states = initialize_step_states(step_ids)
-    # pids = initialize_pids(step_ids)
-
     plan = get_in(state, [:plans, plan_id])
 
     state = state
     |> put_in([:plans, plan_id], initialize_plan(plan))
     |> put_in([:plans, plan_id, :paused], true)
-    # |> put_in([:plans, plan_id, :step_states], new_step_states)
-    # |> put_in([:plans, plan_id, :pids], pids)
-    # |> put_in([:plans, plan_id, :completed], nil)
 
     GenServer.cast(__MODULE__, :broadcast_state)
     {:reply, :ok, state}

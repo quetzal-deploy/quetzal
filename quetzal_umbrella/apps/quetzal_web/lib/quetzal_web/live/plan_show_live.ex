@@ -11,6 +11,7 @@ defmodule QuetzalWeb.PlanLive do
       <button :if={@paused} phx-click="unpause">unpause</button>
       <button :if={@paused} phx-click="tick">tick</button>
       <button phx-click="tick">tick</button>
+      <button phx-click="run_test_job">run test job</button>
 
       <div id="plans">
         <QuetzalWeb.PlanComponent.list plans={@plans} current_plan_id={@plan_id} />
@@ -96,6 +97,11 @@ defmodule QuetzalWeb.PlanLive do
 
   def handle_event("plan_reset", %{"plan_id" => plan_id}, socket) do
     Quetzal.Engine.plan_reset(plan_id)
+    {:noreply, socket}
+  end
+
+  def handle_event("run_test_job", _params, socket) do
+    spawn(fn -> Quetzal.hello end)
     {:noreply, socket}
   end
 

@@ -104,6 +104,18 @@
 
 /* This file is for your main application CSS */
 
+main button {
+    padding: 0.1em 0.4em;
+    border: 1px solid indianred;
+    /*background-color: indianred;*/
+    color: white;
+    border-radius: 4px 0;
+}
+
+main button:hover {
+    background-color: indianred;
+}
+
 .step-tree .step-tree {
     margin-left: 1em;
 }
