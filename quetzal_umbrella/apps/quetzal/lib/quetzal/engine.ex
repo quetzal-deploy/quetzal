@@ -79,7 +79,7 @@ defmodule Quetzal.Engine do
     step_states = initialize_step_states(ids)
 
     plan_with_metadata = initialize_plan(plan)
-    |> IO.inspect()
+    # |> IO.inspect()
 
     new_state = %{ state |
       # plans: Map.put(state.plans, plan_id, plan_with_metadata),
@@ -90,7 +90,7 @@ defmodule Quetzal.Engine do
     }
 
     GenServer.cast(__MODULE__, :broadcast_state)
-    GenServer.cast(__MODULE__, :tick)
+    GenServer.cast(__MODULE__, {:tick, false})
     IO.puts("tick sent")
 
     {:reply, {:ok, plan_id}, new_state}
@@ -105,19 +105,23 @@ defmodule Quetzal.Engine do
   end
 
   def tick do
-    GenServer.cast(__MODULE__, :tick)
+    GenServer.cast(__MODULE__, {:tick, false})
+  end
+
+  def force_tick do
+    GenServer.cast(__MODULE__, {:tick, true})
   end
 
   def tick_plan(plan_id) do
     GenServer.cast(__MODULE__, %{tick_plan: plan_id})
   end
 
-  def handle_cast(:tick, %{paused: true} = state) do
+  def handle_cast({:tick, forced}, %{paused: paused} = state) when not forced and paused  do
     IO.puts "Tick skipped: Engine is paused"
     {:noreply, state}
   end
 
-  def handle_cast(:tick, %{paused: false} = state) do
+  def handle_cast({:tick, forced}, %{paused: paused} = state) when forced or not paused do
     IO.puts("ticking")
 
     desired_states = []
@@ -224,22 +228,21 @@ defmodule Quetzal.Engine do
           :running # TODO: check pid exists and is running, if not set to :failed. Potential for race conditions
 
         :awaiting_children ->
-          IO.inspect "await chld <none>"
+          # IO.inspect "await chld <none>"
           children = get_in(plan, [:steps, id]).children
           {:awaiting_children, children}
 
         {:awaiting_children, []} ->
-          IO.inspect "await chld empty"
+          # IO.inspect "await chld empty"
           # tick required to bubble up the done state
           # GenServer.cast(__MODULE__, :tick)
           GenServer.cast(__MODULE__, %{tick_plan: plan.id})
           :done
 
         {:awaiting_children, child_ids} when is_list(child_ids) ->
-          IO.puts "horsie"
-          IO.inspect "await chld list"
+          # IO.inspect "await chld list"
           new_child_ids = Enum.filter(child_ids, fn id ->
-            IO.inspect id
+            # IO.inspect id
             get_step_state(plan, id) != :done
           end)
 
@@ -271,13 +274,19 @@ defmodule Quetzal.Engine do
     |> Map.keys
   end
 
+  def is_unconstrained(plan, step_id) do
+    constraints = plan["constraint"]
+    IO.puts("plan: #{plan.id} constraints: #{inspect(constraints)}")
+    true
+  end
 
-  def get_runnable_step(state) do
+  def get_runnable_step(plan) do
     # add labels as arg, find steps running (or rather not started and not done) matching each label
 
-    steps_ready = get_steps_with_state(state, :ready)
+    steps_ready = get_steps_with_state(plan, :ready)
+    |> Enum.filter(fn step_id -> is_unconstrained(plan, step_id) end)
 
-    case get_steps_with_state(state, :ready) do
+    case steps_ready do
       [ step | _ ] -> {:ok, step}
       [] -> {:error, "no steps marked ready"}
     end
@@ -301,7 +310,7 @@ defmodule Quetzal.Engine do
         |> set_step_state(plan_id, step_id, :running)
         |> set_step_pid(plan_id, step_id, pid)
 
-        GenServer.cast(__MODULE__, :tick)
+        GenServer.cast(__MODULE__, {:tick, false})
         {:noreply, new_state}
 
       current_state ->
@@ -318,30 +327,23 @@ defmodule Quetzal.Engine do
   end
 
   def handle_call(%{plan_id: plan_id, transition_step: step_id, to: step_state}, _from, state) do
-    GenServer.cast(__MODULE__, :tick)
+    GenServer.cast(__MODULE__, {:tick, false})
 
     new_state = case step_state do
       :awaiting_children ->
-        IO.inspect("ZEBRA")
-        IO.inspect("ZEBRA")
-        IO.inspect("ZEBRA")
-        IO.inspect("ZEBRA")
         step = get_step(state, plan_id, step_id)
-        IO.inspect(step)
         # FIXME: this fails somehow. Loop over the children, subtract step_id from their dependencies, and create new state based on that.
         Enum.reduce(step.children, state, fn child_id, acc ->
-          IO.inspect("ZEBRA hest")
-
           step_state = get_step_state(state, plan_id, child_id)
 
-          IO.inspect("child: #{child_id}, state: #{inspect(step_state)}")
+          # IO.inspect("child: #{child_id}, state: #{inspect(step_state)}")
 
           case step_state do
             {:blocked_by, child_ids} when is_list(child_ids) ->
               new_child_ids = Enum.reject(child_ids, fn child_id -> child_id == step_id end)
               new_step_state = {:blocked_by, new_child_ids}
 
-              IO.puts("child: #{child_id},\n- old state: #{inspect(step_state)},\n- new state: #{inspect(new_step_state)}")
+              # IO.puts("child: #{child_id},\n- old state: #{inspect(step_state)},\n- new state: #{inspect(new_step_state)}")
 
               put_in(acc, [:plans, plan_id, :step_states, child_id], new_step_state)
             _ ->
@@ -355,7 +357,7 @@ defmodule Quetzal.Engine do
 
     end
     |> set_step_state(plan_id, step_id, step_state)
-    |> IO.inspect()
+    # |> IO.inspect()
     |> then(fn new_state -> {:reply, :ok, new_state} end)
   end
 
@@ -397,7 +399,7 @@ defmodule Quetzal.Engine do
 
   def handle_call(:unpause, _from, state) do
     GenServer.cast(__MODULE__, :broadcast_state)
-    GenServer.cast(__MODULE__, :tick)
+    GenServer.cast(__MODULE__, {:tick, false})
     {:reply, :ok, put_in(state, [:paused], false)}
   end
 

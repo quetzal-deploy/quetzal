@@ -28,6 +28,9 @@ defmodule QuetzalWeb.PlanLive do
         </div>
       </div>
       <pre>
+{ inspect(@plans[@plan_id]["constraints"], pretty: true) }
+      </pre>
+      <pre>
 { inspect(@plans[@plan_id].step_states, pretty: true) }
       </pre>
     </Layouts.app>
@@ -70,8 +73,7 @@ defmodule QuetzalWeb.PlanLive do
   end
 
   def handle_event("tick", _params, socket) do
-    IO.puts "Not implemented: Tick during pause"
-    Quetzal.Engine.tick
+    Quetzal.Engine.force_tick
     {:noreply, socket}
   end
 
