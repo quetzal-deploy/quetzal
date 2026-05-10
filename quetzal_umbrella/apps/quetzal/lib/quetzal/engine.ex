@@ -211,14 +211,6 @@ defmodule Quetzal.Engine do
           #   # probably has to run in a second loop, to avoid running on partially stale data
           end)
 
-          case step.parent do
-            nil ->
-              1
-
-            parent -> 2
-
-          end
-
           case new_step_ids do
             [] -> :ready
             _ -> {:blocked_by, new_step_ids}
@@ -265,12 +257,23 @@ defmodule Quetzal.Engine do
     end)
   end
 
-  def get_steps_with_state(state, step_state) do
-    get_steps_with_states(state, [step_state])
+  # If tuple: Unwraps step states that are tuples with an argument, and returns only first part of the tuple.
+  # If not tuple, returns identity
+  def simplify_step_state(step_state) do
+    case step_state do
+      {step_state_, _ } -> step_state_
+      _ -> step_state
+    end
   end
 
-  def get_steps_with_states(state, step_states) do
-    Map.filter(state[:step_states], fn {id, step_state_} -> step_state_ in step_states end)
+  def get_steps_with_state(plan, step_state) do
+    get_steps_with_states(plan, [step_state])
+  end
+
+  def get_steps_with_states(plan, step_states) do
+    Map.filter(plan[:step_states], fn {id, step_state_} ->
+      simplify_step_state(step_state_) in step_states
+    end)
     |> Map.keys
   end
 
@@ -291,6 +294,18 @@ defmodule Quetzal.Engine do
     end)
   end
 
+  def get_steps_with_label(plan, label, value) do
+    Enum.reduce(plan.steps, [], fn {step_id, step}, acc ->
+      labels = step["labels"]
+      cond do
+        Map.has_key?(labels, label) and labels[label] == value ->
+          [step_id | acc]
+        true ->
+          acc
+      end
+    end)
+  end
+
   def is_unconstrained(plan, step_id) do
     running_states = [
       :scheduled,
@@ -301,7 +316,7 @@ defmodule Quetzal.Engine do
 
     constraints = plan["constraints"]
     step = get_in(plan, [:steps, step_id])
-    labels = step["labels"] || %{}
+    labels = step["labels"]
     IO.puts("step: #{step_id} labels: #{inspect(labels)}")
 
     constraints
@@ -311,8 +326,25 @@ defmodule Quetzal.Engine do
     # validate each constraint match
     |> Enum.map(fn %{label: label, value: value, constraint: constraint} ->
       %{"maxUnavailable" => max_unavailable, "selector" => %{"label" => c_label, "value" => c_value}} = constraint
-      IO.puts("constraint match: #{label}=#{value} => max_unavailable=#{max_unavailable}")
-      :ok
+
+      # matching_labels = get_steps_with_label(plan, label, value)
+      # matching_states = get_steps_with_states(plan, running_states)
+      matching_steps = MapSet.intersection(
+        MapSet.new(get_steps_with_label(plan, label, value)),
+        MapSet.new(get_steps_with_states(plan, running_states))
+      )
+      |> MapSet.to_list
+      IO.puts("constraint match: step: #{step_id} #{label}=#{value} => max_unavailable=#{max_unavailable} matching: #{inspect(matching_steps)}")
+      IO.puts("!! ZEBRA")
+      IO.inspect(matching_steps)
+
+      cond do
+        length(matching_steps) < max_unavailable ->
+          :ok
+        true ->
+          {:constrained, %{steps: matching_steps}
+
+      end
     end)
     # check all constraints evaluted to :ok
     |> Enum.all?(fn result -> result == :ok end)
@@ -383,7 +415,8 @@ defmodule Quetzal.Engine do
 
               # IO.puts("child: #{child_id},\n- old state: #{inspect(step_state)},\n- new state: #{inspect(new_step_state)}")
 
-              put_in(acc, [:plans, plan_id, :step_states, child_id], new_step_state)
+              acc
+              |> put_in([:plans, plan_id, :step_states, child_id], new_step_state)
             _ ->
               acc
 
