@@ -8,7 +8,8 @@ defmodule Quetzal.Engine.Runner do
 
   def run_step(plan_id, %{"id" => step_id, "action" => action} = step) do
     IO.puts("running: #{step_id}")
-    Process.sleep(2000)
+    # Process.sleep(2000)
+    Process.sleep(500)
     case Map.fetch(@actions, action) do
       {:ok, module} -> module.run(step)
       :error -> {:error, {:unknown_action, action}}

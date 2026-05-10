@@ -274,10 +274,48 @@ defmodule Quetzal.Engine do
     |> Map.keys
   end
 
+  # combines matching labels and constraints
+  def constraints_x_labels(constraints, labels) do
+    Enum.reduce(constraints, [], fn constraint, acc ->
+      %{"selector" => %{"label" => c_label, "value" => c_value}} = constraint
+
+      acc ++ Enum.reduce(labels, [], fn {label, value}, acc2 ->
+        res = cond do
+          label == c_label and (value == c_value or c_value == "*") ->
+            [ %{label: label, value: value, constraint: constraint} ]
+          true ->
+            []
+        end
+        acc2 ++ res
+      end)
+    end)
+  end
+
   def is_unconstrained(plan, step_id) do
-    constraints = plan["constraint"]
-    IO.puts("plan: #{plan.id} constraints: #{inspect(constraints)}")
-    true
+    running_states = [
+      :scheduled,
+      :running,
+      :awaiting_children,
+      :failed,
+    ]
+
+    constraints = plan["constraints"]
+    step = get_in(plan, [:steps, step_id])
+    labels = step["labels"] || %{}
+    IO.puts("step: #{step_id} labels: #{inspect(labels)}")
+
+    constraints
+    # find the matching constraints and labels
+    |> constraints_x_labels(labels)
+    # |> IO.inspect()
+    # validate each constraint match
+    |> Enum.map(fn %{label: label, value: value, constraint: constraint} ->
+      %{"maxUnavailable" => max_unavailable, "selector" => %{"label" => c_label, "value" => c_value}} = constraint
+      IO.puts("constraint match: #{label}=#{value} => max_unavailable=#{max_unavailable}")
+      :ok
+    end)
+    # check all constraints evaluted to :ok
+    |> Enum.all?(fn result -> result == :ok end)
   end
 
   def get_runnable_step(plan) do
@@ -381,15 +419,15 @@ defmodule Quetzal.Engine do
   end
 
   def plan_pause(plan_id) do
-    GenServer.call(__MODULE__, %{plan_pause: plan_id})
+    GenServer.call(__MODULE__, {:plan_pause, plan_id})
   end
 
   def plan_unpause(plan_id) do
-    GenServer.call(__MODULE__, %{plan_unpause: plan_id})
+    GenServer.call(__MODULE__, {:plan_unpause, plan_id})
   end
 
   def plan_reset(plan_id) do
-    GenServer.call(__MODULE__, %{plan_reset: plan_id})
+    GenServer.call(__MODULE__, {:plan_reset, plan_id})
   end
 
   def handle_call(:pause, _from, state) do
@@ -403,18 +441,18 @@ defmodule Quetzal.Engine do
     {:reply, :ok, put_in(state, [:paused], false)}
   end
 
-  def handle_call(%{plan_pause: plan_id}, _from, state) do
+  def handle_call({:plan_pause, plan_id}, _from, state) do
     GenServer.cast(__MODULE__, :broadcast_state)
     {:reply, :ok, put_in(state, [:plans, plan_id, :paused], true)}
   end
 
-  def handle_call(%{plan_unpause: plan_id}, _from, state) do
+  def handle_call({:plan_unpause, plan_id}, _from, state) do
     GenServer.cast(__MODULE__, :broadcast_state)
     GenServer.cast(__MODULE__, %{tick_plan: plan_id})
     {:reply, :ok, put_in(state, [:plans, plan_id, :paused], false)}
   end
 
-  def handle_call(%{plan_reset: plan_id}, _from, state) do
+  def handle_call({:plan_reset, plan_id}, _from, state) do
     plan = get_in(state, [:plans, plan_id])
 
     state = state

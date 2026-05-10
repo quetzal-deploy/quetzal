@@ -28,9 +28,11 @@ defmodule QuetzalWeb.PlanLive do
         </div>
       </div>
       <pre>
+Constraints:
 { inspect(@plans[@plan_id]["constraints"], pretty: true) }
       </pre>
       <pre>
+Step states:
 { inspect(@plans[@plan_id].step_states, pretty: true) }
       </pre>
     </Layouts.app>
