@@ -12,8 +12,7 @@ defmodule Quetzal.Steps do
   def flatten(step) do
       # ensure step has an ID and other defaults
       step = add_defaults(step)
-      %{"id" => id} = step
-
+      %{"id" => id, "parallel" => parallel} = step
 
       child_steps = Map.get(step, "steps", [])
       # give defaults to children
@@ -32,6 +31,22 @@ defmodule Quetzal.Steps do
       |> Enum.map(fn %{"dependencies" => dependencies} = child ->
         %{ child | "dependencies" => [ id | dependencies ], parent: id }
       end)
+      |> IO.inspect()
+      # force child steps to run in order, by making step n depend on step n-1
+      # FIXME: skip this is parallel=true
+      |> Enum.with_index(fn child, index ->
+        case parallel do
+          true -> child
+          false ->
+            case index do
+              0 ->
+                child
+              n ->
+                %{ child | "dependencies" => [ Enum.at(child_steps, n-1)["id"] | child["dependencies"]]}
+            end
+        end
+      end)
+      |> IO.inspect()
       # turn in to map while recursing
       |> Enum.reduce(%{id => step_without_children}, fn child, acc ->
         Map.merge(acc, flatten(child))

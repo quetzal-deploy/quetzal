@@ -220,6 +220,7 @@ defmodule Quetzal.Engine do
           :running # TODO: check pid exists and is running, if not set to :failed. Potential for race conditions
 
         :awaiting_children ->
+          GenServer.cast(__MODULE__, %{tick_plan: plan.id})
           # IO.inspect "await chld <none>"
           children = get_in(plan, [:steps, id]).children
           {:awaiting_children, children}
@@ -342,7 +343,7 @@ defmodule Quetzal.Engine do
         length(matching_steps) < max_unavailable ->
           :ok
         true ->
-          {:constrained, %{steps: matching_steps}
+          {:constrained, %{steps: matching_steps}}
 
       end
     end)
