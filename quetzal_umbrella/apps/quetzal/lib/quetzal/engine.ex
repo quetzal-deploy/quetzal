@@ -241,7 +241,10 @@ defmodule Quetzal.Engine do
 
           # new_child_ids = child_ids -- plan.steps_done
 
-          {:awaiting_children, new_child_ids}
+          case new_child_ids do
+            [] -> :done
+            _ -> {:awaiting_children, new_child_ids}
+          end
 
           # case new_child_ids do
           #   [] -> :ready # FIXME: :ready must be wrong!!!
