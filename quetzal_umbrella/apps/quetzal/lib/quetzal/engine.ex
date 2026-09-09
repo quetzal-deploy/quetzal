@@ -113,7 +113,7 @@ defmodule Quetzal.Engine do
   end
 
   def tick_plan(plan_id) do
-    GenServer.cast(__MODULE__, %{tick_plan: plan_id})
+    GenServer.cast(__MODULE__, {:tick_plan, plan_id, false})
   end
 
   def handle_cast({:tick, forced}, %{paused: paused} = state) when not forced and paused  do
@@ -128,8 +128,13 @@ defmodule Quetzal.Engine do
 
     new_plans_state = Map.new(state[:plans], fn {plan_id, plan} ->
 
-      if plan.completed == nil and plan.paused == false do
-        GenServer.cast(__MODULE__, %{tick_plan: plan_id})
+      IO.puts "Plan paused? #{plan.paused}"
+      # todo: make :tick_plan take a force parameter (like :tick), and make :tick_plan only run when not paused
+      # then this only have to test if plan.completed == nil
+      if plan.completed == nil and (plan.paused == false or forced) do
+      # next line doesn't work for some reason
+      # if plan.completed == nil do
+        GenServer.cast(__MODULE__, {:tick_plan, plan_id, forced})
       end
 
       {plan_id, %{plan | step_states: update_step_states(plan) }}
@@ -142,42 +147,45 @@ defmodule Quetzal.Engine do
     {:noreply, new_state}
   end
 
-  def handle_cast(%{tick_plan: plan_id}, state) do
-    plan = get_in(state, [:plans, plan_id])
+  def handle_cast({:tick_plan, plan_id, forced}, state) do
+    case get_in(state, [:plans, plan_id]) do
+      %{paused: true} when not forced -> {:noreply, state}
+      plan ->
 
-    new_state = put_in(state, [:plans, plan_id, :step_states], update_step_states(plan))
+        new_state = put_in(state, [:plans, plan_id, :step_states], update_step_states(plan))
 
-    runnable_step = get_runnable_step(get_in(new_state, [:plans, plan_id]))
+        runnable_step = get_runnable_step(get_in(new_state, [:plans, plan_id]))
 
-    new_state = case runnable_step do
-      {:ok, step_id} ->
-        step_description = get_in(new_state, [:plans, plan_id, :steps, step_id, "description"])
-        IO.puts "Scheduling step: #{step_id}: #{step_description}"
-        GenServer.cast(__MODULE__, %{run_step: step_id, plan_id: plan_id})
-        put_in(new_state, [:plans, plan_id, :step_states, step_id], :scheduled)
+        new_state = case runnable_step do
+          {:ok, step_id} ->
+            step_description = get_in(new_state, [:plans, plan_id, :steps, step_id, "description"])
+            IO.puts "Scheduling step: #{step_id}: #{step_description}"
+            GenServer.cast(__MODULE__, %{run_step: step_id, plan_id: plan_id})
+            put_in(new_state, [:plans, plan_id, :step_states, step_id], :scheduled)
 
-      {:error, reason} ->
-        IO.puts "Can't schedule more steps: #{reason}"
-        new_state
+          {:error, reason} ->
+            IO.puts "Can't schedule more steps: #{reason}"
+            new_state
+        end
+
+        step_states = get_in(new_state, [:plans, plan_id, :step_states])
+        plan_completed = Enum.all?(step_states, fn {_, step_state} -> step_state == :done end)
+
+        # IO.inspect plan_completed
+        # IO.inspect(step_states)
+
+        new_state = case plan_completed do
+          false ->
+            new_state
+          true ->
+            # fixme: take completion timestamp of last step to finish
+            put_in(new_state, [:plans, plan_id, :completed], DateTime.utc_now)
+        end
+
+        GenServer.cast(__MODULE__, :broadcast_state)
+
+        {:noreply, new_state}
     end
-
-    step_states = get_in(new_state, [:plans, plan_id, :step_states])
-    plan_completed = Enum.all?(step_states, fn {_, step_state} -> step_state == :done end)
-
-    # IO.inspect plan_completed
-    # IO.inspect(step_states)
-
-    new_state = case plan_completed do
-      false ->
-        new_state
-      true ->
-        # fixme: take completion timestamp of last step to finish
-        put_in(new_state, [:plans, plan_id, :completed], DateTime.utc_now)
-    end
-
-    GenServer.cast(__MODULE__, :broadcast_state)
-
-    {:noreply, new_state}
   end
 
   def get_step_state(state, step) do
@@ -220,7 +228,7 @@ defmodule Quetzal.Engine do
           :running # TODO: check pid exists and is running, if not set to :failed. Potential for race conditions
 
         :awaiting_children ->
-          GenServer.cast(__MODULE__, %{tick_plan: plan.id})
+          GenServer.cast(__MODULE__, {:tick_plan, plan.id, false})
           # IO.inspect "await chld <none>"
           children = get_in(plan, [:steps, id]).children
           {:awaiting_children, children}
@@ -229,7 +237,7 @@ defmodule Quetzal.Engine do
           # IO.inspect "await chld empty"
           # tick required to bubble up the done state
           # GenServer.cast(__MODULE__, :tick)
-          GenServer.cast(__MODULE__, %{tick_plan: plan.id})
+          GenServer.cast(__MODULE__, {:tick_plan, plan.id, false})
           :done
 
         {:awaiting_children, child_ids} when is_list(child_ids) ->
@@ -485,7 +493,7 @@ defmodule Quetzal.Engine do
 
   def handle_call({:plan_unpause, plan_id}, _from, state) do
     GenServer.cast(__MODULE__, :broadcast_state)
-    GenServer.cast(__MODULE__, %{tick_plan: plan_id})
+    GenServer.cast(__MODULE__, {:tick_plan, plan_id, false})
     {:reply, :ok, put_in(state, [:plans, plan_id, :paused], false)}
   end
 
