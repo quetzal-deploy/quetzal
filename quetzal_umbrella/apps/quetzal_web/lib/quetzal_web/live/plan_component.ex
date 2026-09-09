@@ -38,7 +38,15 @@ defmodule QuetzalWeb.PlanComponent do
     <ul class="step-tree">
       <% step=@steps[@parent_id] %>
       <% step_state=simplify_step_state(@step_states[@parent_id]) %>
-      <li class={["step", step_state]}>{step["description"]}</li>
+      <li class={["step", step_state]}>
+        <span class="description">
+          {step["description"]}
+          <span class="labels" :if={ Enum.count(step["labels"]) > 0 }>
+            labels:
+            <span class="label" :for={ {key, value} <- step["labels"]}>{key}={value}</span>
+          </span>
+        </span>
+      </li>
       <li :for={step_id <- step.children}>
         <.tree steps={@steps} step_states={@step_states} parent_id={step_id} />
       </li>

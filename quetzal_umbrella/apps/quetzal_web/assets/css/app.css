@@ -253,3 +253,15 @@ main button:hover {
     content: "failed";
     color: indianred;
 }
+
+.labels {
+    display: inline;
+}
+
+.labels .label {
+    display: inline;
+}
+
+.label + .label::before {
+    content: ", ";
+}
