@@ -28,13 +28,6 @@ defmodule Quetzal.Engine do
     }
   end
 
-  def schedule_plan(plan) do
-    # GenServer.call(__MODULE__, %{schedule_plan: plan})
-    # fixme: do something more, e.g. handle constraints too
-    # IO.inspect(plan)
-    GenServer.call(__MODULE__, %{schedule_plan: plan})
-  end
-
   def schedule_action(action) do
     GenServer.call(__MODULE__, %{schedule_action: action})
   end
@@ -66,7 +59,45 @@ defmodule Quetzal.Engine do
     |> Map.put_new(:scheduled, DateTime.utc_now)
   end
 
-  def handle_call(%{schedule_plan: plan}, _from, state) do
+  def schedule_plan(plan) do
+    GenServer.call(__MODULE__, {:schedule_plan, plan})
+  end
+
+  def schedule_plan(repository, deployment, plan) do
+    # GenServer.call(__MODULE__, %{schedule_plan: plan})
+    # fixme: do something more, e.g. handle constraints too
+    GenServer.call(__MODULE__, {:schedule_plan, %{repository: repository, deployment: deployment, plan_id: plan}})
+  end
+
+  # TODO: change all repository to repository_id when containing the id
+  def handle_call({:schedule_plan, %{repository: repository_id, deployment: deployment, plan_id: plan_id} = params }, _from, state) do
+    IO.inspect(params)
+    morph_evaluator = "/home/adtu/src/quetzal-evaluators/quetzal-morph.nix"
+
+    repository = Quetzal.Git.RepoManager.get_repository(repository_id)
+    deployment_spec = get_in(repository, [:deployments, deployment])
+    # deployment_path = Path.join(repository.path, Map.get(deployment_spec, "path"))
+    deployment_path = "/home/adtu/src/quetzal-rs/test/deployments/1.nix"
+    IO.inspect(repository)
+    IO.inspect(deployment_path)
+
+    # case Quetzal.deployment_resources(morph_evaluator, deployment_path) do
+    #   {:ok, resources} -> IO.inspect(resources)
+    #   {:err, reason} -> IO.puts(reason)
+    # end
+
+    # {:ok, plans} = Quetzal.deployment_plans(morph_evaluator, deployment_path)
+    # IO.puts("deployment plans:")
+    # IO.inspect(plans)
+
+    args = "/home/adtu/src/quetzal-rs/tmp/build-args-file.json"
+    {:ok, plan} = Quetzal.deployment_plan(morph_evaluator, deployment_path, "switch", args)
+    IO.puts("plan:")
+    IO.inspect(plan)
+
+    # {:ok, plan_id} = Quetzal.Engine.schedule_plan(plan)
+    # IO.puts "Scheduled plan with id=#{plan_id}"
+
     %{"plan" => plan_inner, "constraints" => constraints} = plan
 
     plan_id = UUID.uuid4()
@@ -92,6 +123,41 @@ defmodule Quetzal.Engine do
     GenServer.cast(__MODULE__, :broadcast_state)
     GenServer.cast(__MODULE__, {:tick, false})
     IO.puts("tick sent")
+
+    IO.puts("schedule_plan: end")
+
+    {:reply, {:ok, plan_id}, new_state}
+  end
+
+  def handle_call({:schedule_plan, plan}, _from, state) do
+    IO.puts("schedule_plan: start")
+    %{"plan" => plan_inner, "constraints" => constraints} = plan
+
+    plan_id = UUID.uuid4()
+
+    # TODO: Have one GenServer for each plan, and move this to init
+    steps = Quetzal.Steps.flatten(plan_inner)
+
+    ids = Map.keys(steps)
+    pids = initialize_pids(ids)
+    step_states = initialize_step_states(ids)
+
+    plan_with_metadata = initialize_plan(plan)
+    # |> IO.inspect()
+
+    new_state = %{ state |
+      # plans: Map.put(state.plans, plan_id, plan_with_metadata),
+      plans: Map.put(state.plans, plan_with_metadata.id, plan_with_metadata),
+      # steps: steps,
+      # pids: pids,
+      # step_states: step_states,
+    }
+
+    GenServer.cast(__MODULE__, :broadcast_state)
+    GenServer.cast(__MODULE__, {:tick, false})
+    IO.puts("tick sent")
+
+    IO.puts("schedule_plan: end")
 
     {:reply, {:ok, plan_id}, new_state}
   end

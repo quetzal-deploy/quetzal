@@ -4,6 +4,7 @@
   # https://devenv.sh/basics/
   env.GREET = "devenv";
   env.TAILWINDCSS_PATH = lib.getExe pkgs.tailwindcss_4;
+  env.FORCOLA_BUILD = "1";
 
   # https://devenv.sh/packages/
   packages = with pkgs; [

@@ -35,6 +35,10 @@ Constraints:
 Step states:
 { inspect(@plans[@plan_id].step_states, pretty: true) }
       </pre>
+Steps:
+      <pre>
+{ inspect(@plans[@plan_id].steps, pretty: true) }
+      </pre>
     </Layouts.app>
     """
   end

@@ -10,7 +10,9 @@ defmodule Quetzal.Application do
     children = [
       {DNSCluster, query: Application.get_env(:quetzal, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Quetzal.PubSub},
+      # Briefly,
       Quetzal.Engine,
+      Quetzal.Git.RepoManager,
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Quetzal.Supervisor)

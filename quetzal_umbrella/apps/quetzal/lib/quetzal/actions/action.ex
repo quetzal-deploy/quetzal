@@ -1,3 +1,4 @@
 defmodule Quetzal.Actions.Action do
-  @callback run(step :: any) :: any
+  # tighten to maps
+  @callback run(cache :: any, step :: any) :: any
 end

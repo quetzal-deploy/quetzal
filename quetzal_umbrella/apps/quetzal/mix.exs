@@ -41,6 +41,9 @@ defmodule Quetzal.MixProject do
       {:elixir_uuid, "~> 1.2"},
       {:jason, "~> 1.4"},
       {:norm, "~> 0.13"},
+      {:briefly, "~> 0.5.1"},
+      {:git, "~> 0.7.0"},
+      {:forcola, "~> 0.3.3"}, # optional dependency of git
     ]
   end
 

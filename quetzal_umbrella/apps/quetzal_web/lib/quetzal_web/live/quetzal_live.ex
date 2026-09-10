@@ -8,19 +8,31 @@ defmodule QuetzalWeb.Dashboard do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash}>
+      <QuetzalWeb.RepositoryComponent.list repositories={@repositories} />
       <QuetzalWeb.PlanComponent.list plans={@plans} current_plan_id={nil} />
     </Layouts.app>
     """
   end
 
   def mount(params, _session, socket) do
-    QuetzalWeb.Endpoint.subscribe(@topic)
+    QuetzalWeb.Endpoint.subscribe("state")
+    QuetzalWeb.Endpoint.subscribe("repositories")
+
     state = Quetzal.Engine.get_state
-    {:ok, assign(socket, foo(state))}
+    repositories = Quetzal.Git.RepoManager.get_repositories
+    # {:ok, assign(socket, foo(state))}
+    {
+      :ok,
+      socket
+      |> assign(foo(state))
+      |> assign(:repositories, repositories)
+    }
   end
 
-  def handle_info(%{topic: topic, event: event, payload: payload}, socket) do
-    IO.inspect(topic)
+  # todo: rename this state to something reflecting it's the state from Quetzal.Engine
+  def handle_info(%{topic: "state", event: event, payload: payload}, socket) do
+    IO.puts("#{__MODULE__}: topic: state")
+    IO.inspect("topic: state")
     IO.inspect(event)
     # IO.inspect(payload)
     {
@@ -28,6 +40,15 @@ defmodule QuetzalWeb.Dashboard do
       assign(
         socket, foo(payload)
       )
+    }
+  end
+
+  def handle_info(%{topic: "repositories", event: _event, payload: repositories}, socket) do
+    IO.puts("#{__MODULE__}: topic: repositories")
+    {
+      :noreply,
+      socket
+      |> assign(:repositories, repositories)
     }
   end
 
@@ -61,5 +82,11 @@ defmodule QuetzalWeb.Dashboard do
       end
     end)
     |> Enum.map(fn {id, _} -> id end)
+  end
+
+  def handle_event("schedule_plan", %{"repository" => repository, "deployment" => deployment, "plan_id" => plan_id} = params, socket) do
+    IO.inspect(params)
+    Quetzal.Engine.schedule_plan(repository, deployment, plan_id)
+    {:noreply, socket}
   end
 end

@@ -17,6 +17,15 @@ defmodule Quetzal.Schemas do
       :all)
   end
 
+  def list_of_strings do
+    # list of strings
+    coll_of(spec(is_binary()))
+  end
+
+  def any do
+    spec(fn _ -> true end)
+  end
+
   def plan do
     schema(%{})
   end
