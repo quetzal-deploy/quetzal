@@ -77,7 +77,7 @@ defmodule Quetzal.Engine do
     repository = Quetzal.Git.RepoManager.get_repository(repository_id)
     deployment_spec = get_in(repository, [:deployments, deployment])
     # deployment_path = Path.join(repository.path, Map.get(deployment_spec, "path"))
-    deployment_path = "/home/adtu/src/quetzal-rs/test/deployments/1.nix"
+    deployment_path = "test/deployments/1.nix"
     IO.inspect(repository)
     IO.inspect(deployment_path)
 
