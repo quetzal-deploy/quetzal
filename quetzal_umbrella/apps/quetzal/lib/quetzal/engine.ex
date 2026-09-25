@@ -72,12 +72,14 @@ defmodule Quetzal.Engine do
   # TODO: change all repository to repository_id when containing the id
   def handle_call({:schedule_plan, %{repository: repository_id, deployment: deployment, plan_id: plan_id} = params }, _from, state) do
     IO.inspect(params)
-    morph_evaluator = "/home/adtu/src/quetzal-evaluators/quetzal-morph.nix"
+    # morph_evaluator = "../evaluators/quetzal-morph.nix"
+    morph_evaluator = Path.join(Application.get_env(:quetzal, :evaluators), "quetzal-morph.nix")
 
     repository = Quetzal.Git.RepoManager.get_repository(repository_id)
     deployment_spec = get_in(repository, [:deployments, deployment])
     # deployment_path = Path.join(repository.path, Map.get(deployment_spec, "path"))
-    deployment_path = "test/deployments/1.nix"
+    # deployment_path = "test/deployments/1.nix"
+    deployment_path = Path.join(Application.get_env(:quetzal, :evaluators), "test/deployments/1.nix")
     IO.inspect(repository)
     IO.inspect(deployment_path)
 

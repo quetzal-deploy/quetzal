@@ -5,6 +5,7 @@
   env.GREET = "devenv";
   env.TAILWINDCSS_PATH = lib.getExe pkgs.tailwindcss_4;
   env.FORCOLA_BUILD = "1";
+  env.QUETZAL_EVALUATORS = inputs.evaluators;
 
   # https://devenv.sh/packages/
   packages = with pkgs; [

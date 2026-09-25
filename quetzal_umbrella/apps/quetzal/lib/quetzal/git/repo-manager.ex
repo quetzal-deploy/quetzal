@@ -123,7 +123,8 @@ defmodule Quetzal.Git.RepoManager do
 
       {:ok, deployments} = scan_deployments(path)
 
-      morph_evaluator = "/home/adtu/src/quetzal-evaluators/quetzal-morph.nix"
+      # morph_evaluator = "../evaluators/quetzal-morph.nix"
+      morph_evaluator = Path.join(Application.get_env(:quetzal, :evaluators), "quetzal-morph.nix")
 
       Enum.each(deployments, fn {deployment, spec} ->
         deployment_path = Path.join(path, Map.get(spec, "path"))

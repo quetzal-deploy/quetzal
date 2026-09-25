@@ -7,6 +7,9 @@ import Config
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
 
+config :quetzal,
+  evaluators: System.get_env("QUETZAL_EVALUATORS")
+
 config :quetzal_web, QuetzalWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 

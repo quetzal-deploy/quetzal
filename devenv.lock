@@ -3,17 +3,33 @@
     "devenv": {
       "locked": {
         "dir": "src/modules",
-        "lastModified": 1790321541,
-        "narHash": "sha256-KKg7UInUjwijiB3Onu/a4QR2Ho8SR+eshB8WV2MUc5M=",
+        "lastModified": 1790381990,
+        "narHash": "sha256-lsJCcmLVHvvT28o7fA1KZHFgUdubtwhegqn4baJQeUg=",
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "4c1ba7d6b3e5f39fa5a2b2be7ab6444f0b030ce1",
+        "rev": "a5c34429421e077df6f8f133e502617bedc22206",
         "type": "github"
       },
       "original": {
         "dir": "src/modules",
         "owner": "cachix",
         "repo": "devenv",
+        "type": "github"
+      }
+    },
+    "evaluators": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790410118,
+        "narHash": "sha256-b4qhGOf/5hi4aSZGg83xptUg0f0yHtjI9HqTFNR+mqY=",
+        "owner": "quetzal-deploy",
+        "repo": "quetzal-evaluators",
+        "rev": "02523e2c187ddbb79630a4134a26f495854dd1c1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "quetzal-deploy",
+        "repo": "quetzal-evaluators",
         "type": "github"
       }
     },
@@ -56,6 +72,7 @@
     "root": {
       "inputs": {
         "devenv": "devenv",
+        "evaluators": "evaluators",
         "nixpkgs": "nixpkgs"
       }
     }
