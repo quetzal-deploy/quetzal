@@ -92,7 +92,7 @@ defmodule Quetzal.Engine do
     # IO.puts("deployment plans:")
     # IO.inspect(plans)
 
-    args = "/home/adtu/src/quetzal-rs/tmp/build-args-file.json"
+    args = Path.join(Application.get_env(:quetzal, :evaluators), "test/deployments/1.args.nix")
     {:ok, plan} = Quetzal.deployment_plan(morph_evaluator, deployment_path, "switch", args)
     IO.puts("plan:")
     IO.inspect(plan)

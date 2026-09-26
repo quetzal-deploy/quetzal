@@ -3,11 +3,11 @@
     "devenv": {
       "locked": {
         "dir": "src/modules",
-        "lastModified": 1790381990,
-        "narHash": "sha256-lsJCcmLVHvvT28o7fA1KZHFgUdubtwhegqn4baJQeUg=",
+        "lastModified": 1790415795,
+        "narHash": "sha256-nvpxhuC///gvHzRj9/8A+3+2frKEP8kaabBuQDRO4G4=",
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "a5c34429421e077df6f8f133e502617bedc22206",
+        "rev": "6d76db3889deba50ba7d906ec710d59fcd86354a",
         "type": "github"
       },
       "original": {
@@ -20,11 +20,11 @@
     "evaluators": {
       "flake": false,
       "locked": {
-        "lastModified": 1790410118,
-        "narHash": "sha256-b4qhGOf/5hi4aSZGg83xptUg0f0yHtjI9HqTFNR+mqY=",
+        "lastModified": 1790421981,
+        "narHash": "sha256-0bDFE7uPwmVE3D9Olk19nMhbnGwGFuAnZ83vATDHlZI=",
         "owner": "quetzal-deploy",
         "repo": "quetzal-evaluators",
-        "rev": "02523e2c187ddbb79630a4134a26f495854dd1c1",
+        "rev": "829b4044d2dccf3daba838c8bea1af74abe16115",
         "type": "github"
       },
       "original": {
