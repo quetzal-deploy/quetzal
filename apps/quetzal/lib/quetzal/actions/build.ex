@@ -1,6 +1,6 @@
 defmodule Quetzal.Actions.Build do
-  @behaviour Action
+  @behaviour Quetzal.Actions.Action
 
   @impl true
-  def run(step), do: IO.inspect(step)
+  def run(_cache, step), do: IO.inspect(step)
 end

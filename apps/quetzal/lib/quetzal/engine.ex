@@ -40,7 +40,7 @@ defmodule Quetzal.Engine do
     Enum.reduce(ids, %{}, fn id, acc -> Map.put(acc, id, nil) end)
   end
 
-  def initialize_plan(%{"plan" => plan_inner, "constraints" => constraints} = plan) do
+  def initialize_plan(%{"plan" => plan_inner, "constraints" => _constraints} = plan) do
     steps = Quetzal.Steps.flatten(plan_inner)
     ids = Map.keys(steps)
     pids = initialize_pids(ids)
@@ -76,17 +76,16 @@ defmodule Quetzal.Engine do
     morph_evaluator = Path.join(Application.get_env(:quetzal, :evaluators), "quetzal-morph.nix")
 
     repository = Quetzal.Git.RepoManager.get_repository(repository_id)
-    deployment_spec = get_in(repository, [:deployments, deployment])
-    # deployment_path = Path.join(repository.path, Map.get(deployment_spec, "path"))
-    # deployment_path = "test/deployments/1.nix"
     deployment_path = Path.join(Application.get_env(:quetzal, :evaluators), "test/deployments/1.nix")
     IO.inspect(repository)
     IO.inspect(deployment_path)
 
-    # case Quetzal.deployment_resources(morph_evaluator, deployment_path) do
-    #   {:ok, resources} -> IO.inspect(resources)
-    #   {:err, reason} -> IO.puts(reason)
-    # end
+    case Quetzal.deployment_resources(morph_evaluator, deployment_path) do
+      {:ok, resources} ->
+        IO.puts("deployment resources:")
+        IO.inspect(resources)
+      {:err, reason} -> IO.puts(reason)
+    end
 
     # {:ok, plans} = Quetzal.deployment_plans(morph_evaluator, deployment_path)
     # IO.puts("deployment plans:")
@@ -94,13 +93,13 @@ defmodule Quetzal.Engine do
 
     args = Path.join(Application.get_env(:quetzal, :evaluators), "test/deployments/1.args.nix")
     {:ok, plan} = Quetzal.deployment_plan(morph_evaluator, deployment_path, "switch", args)
-    IO.puts("plan:")
-    IO.inspect(plan)
+    # IO.puts("plan:")
+    # IO.inspect(plan)
 
     # {:ok, plan_id} = Quetzal.Engine.schedule_plan(plan)
     # IO.puts "Scheduled plan with id=#{plan_id}"
 
-    %{"plan" => plan_inner, "constraints" => constraints} = plan
+    %{"plan" => plan_inner, "constraints" => _constraints} = plan
 
     plan_id = UUID.uuid4()
 

@@ -69,7 +69,7 @@ Steps:
     end
   end
 
-  def handle_info(%{topic: topic, event: event, payload: payload}, socket) do
+  def handle_info(%{topic: _topic, event: event, payload: payload}, socket) do
     {
       :noreply,
       assign(
@@ -105,11 +105,6 @@ Steps:
 
   def handle_event("plan_reset", %{"plan_id" => plan_id}, socket) do
     Quetzal.Engine.plan_reset(plan_id)
-    {:noreply, socket}
-  end
-
-  def handle_event("run_test_job", _params, socket) do
-    spawn(fn -> Quetzal.hello end)
     {:noreply, socket}
   end
 

@@ -1,10 +1,6 @@
 defmodule QuetzalWeb.Dashboard do
   use QuetzalWeb, :live_view
 
-  @topic "state"
-
-  # brug phoenix channels til at opdatere state fra genserveren: https://hexdocs.pm/phoenix/channels.html
-
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash}>
@@ -14,7 +10,7 @@ defmodule QuetzalWeb.Dashboard do
     """
   end
 
-  def mount(params, _session, socket) do
+  def mount(_params, _session, socket) do
     QuetzalWeb.Endpoint.subscribe("state")
     QuetzalWeb.Endpoint.subscribe("repositories")
 
@@ -71,7 +67,7 @@ defmodule QuetzalWeb.Dashboard do
 
   def steps_with_dep(steps, parent_step_id) do
     steps
-    |> Enum.filter(fn {step_id, step} ->
+    |> Enum.filter(fn {_step_id, step} ->
       %{"dependencies" => dependencies} = step
       case parent_step_id do
         nil ->
